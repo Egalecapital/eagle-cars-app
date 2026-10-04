@@ -53,7 +53,7 @@ export default function AppTabs() {
             href="/requests"
             asChild
           >
-            <TabButton>Yêu cầu</TabButton>
+            <TabButton>Đơn của tôi</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>

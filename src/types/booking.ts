@@ -1,7 +1,7 @@
 import type { ServiceType } from '@/types/car';
 
 /**
- * Kiểu dữ liệu yêu cầu đặt xe dùng chung cho Booking, "Yêu cầu của tôi"
+ * Kiểu dữ liệu yêu cầu đặt xe dùng chung cho Booking, "Đơn của tôi"
  * và chi tiết yêu cầu.
  *
  * UI chỉ làm việc với các kiểu này thông qua booking-service.ts.

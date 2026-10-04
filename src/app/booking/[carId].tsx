@@ -380,7 +380,7 @@ export default function BookingScreen() {
             <Text style={styles.infoNoticeText}>
               Lưu ý: Ứng dụng hiện chưa kết nối hệ thống đặt xe trực tuyến, nên
               yêu cầu này chưa được lưu lên máy chủ và chưa phát sinh thanh
-              toán. Yêu cầu được lưu tạm trong mục &quot;Yêu cầu của tôi&quot; trên
+              toán. Yêu cầu được lưu tạm trong mục &quot;Đơn của tôi&quot; trên
               thiết bị này và sẽ mất khi app được tắt hẳn. Xe chỉ được giữ sau
               khi Eagle Capital xác nhận với bạn.
             </Text>
@@ -391,7 +391,7 @@ export default function BookingScreen() {
             activeOpacity={0.8}
             onPress={goToMyRequests}
           >
-            <Text style={styles.bookingButtonText}>XEM YÊU CẦU CỦA TÔI</Text>
+            <Text style={styles.bookingButtonText}>XEM ĐƠN CỦA TÔI</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

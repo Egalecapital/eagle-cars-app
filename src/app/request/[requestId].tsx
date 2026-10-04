@@ -72,7 +72,7 @@ export default function RequestDetailScreen() {
         <Text style={styles.eyebrow}>CHI TIẾT YÊU CẦU</Text>
 
         <View style={styles.headerRow}>
-          <Text style={styles.requestCode}>Mã tạm: {request.id}</Text>
+          <Text style={styles.requestCode}>Mã yêu cầu tạm: {request.id}</Text>
           <BookingStatusBadge status={request.status} />
         </View>
 
@@ -130,8 +130,10 @@ export default function RequestDetailScreen() {
         </View>
 
         <Text style={styles.notice}>
-          Gửi lúc {formatDateTime(request.createdAt)}. Yêu cầu hiện chỉ lưu tạm
-          trên thiết bị này, chưa được lưu lên máy chủ.
+          Tạo lúc {formatDateTime(request.createdAt)}. Đây là yêu cầu đặt xe,
+          chưa phải đặt xe được xác nhận chính thức. Mã trên chỉ là mã tạm;
+          yêu cầu hiện chỉ lưu tạm trên thiết bị này, chưa được gửi lên máy
+          chủ.
         </Text>
       </ScrollView>
     </View>

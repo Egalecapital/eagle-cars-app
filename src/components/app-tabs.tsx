@@ -29,7 +29,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="requests">
-        <NativeTabs.Trigger.Label>Yêu cầu</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Đơn của tôi</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: 'doc.text', selected: 'doc.text.fill' }}
           md="receipt_long"

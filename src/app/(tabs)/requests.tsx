@@ -35,7 +35,7 @@ export default function MyRequestsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.eyebrow}>EAGLE CAPITAL CARS</Text>
-        <Text style={styles.title}>YÊU CẦU CỦA TÔI</Text>
+        <Text style={styles.title}>ĐƠN CỦA TÔI</Text>
 
         {!loading && requests.length === 0 && (
           <View style={styles.empty}>
@@ -44,7 +44,7 @@ export default function MyRequestsScreen() {
             </View>
 
             <Text style={styles.emptyTitle}>
-              Bạn chưa có yêu cầu đặt xe nào.
+              Bạn chưa có yêu cầu đặt xe
             </Text>
 
             <Text style={styles.emptyText}>
@@ -65,8 +65,8 @@ export default function MyRequestsScreen() {
         {requests.length > 0 && (
           <>
             <View style={styles.headingRow}>
-              <Text style={styles.subtitle}>Lịch sử yêu cầu đặt xe</Text>
-              <Text style={styles.count}>{requests.length} yêu cầu</Text>
+              <Text style={styles.subtitle}>Yêu cầu đặt xe trên thiết bị này</Text>
+              <Text style={styles.count}>{requests.length} đơn</Text>
             </View>
 
             {requests.map((request) => (
@@ -78,8 +78,10 @@ export default function MyRequestsScreen() {
             ))}
 
             <Text style={styles.notice}>
-              Yêu cầu hiện chỉ được lưu tạm trên thiết bị này và sẽ mất khi
-              app được tắt hẳn. Eagle Capital sẽ liên hệ để xác nhận.
+              Đơn ở trạng thái Chờ xác nhận chưa phải đặt xe được xác nhận
+              chính thức. Tổng tiền là giá dự kiến. Đơn hiện chỉ lưu tạm trên
+              thiết bị này, chưa gửi lên máy chủ và sẽ mất khi app được tắt
+              hẳn. Eagle Capital sẽ liên hệ để xác nhận.
             </Text>
           </>
         )}
@@ -121,6 +123,10 @@ function RequestCard({ request, onPress }: RequestCardProps) {
           </Text>
 
           <Text style={styles.serviceType}>{request.serviceType}</Text>
+
+          <Text style={styles.requestCode} numberOfLines={1}>
+            Mã tạm: {request.id}
+          </Text>
         </View>
       </View>
 
@@ -301,6 +307,13 @@ const styles = StyleSheet.create({
     color: GOLD,
     fontSize: 13,
     fontWeight: '800',
+    marginTop: 4,
+  },
+
+  requestCode: {
+    color: '#888888',
+    fontSize: 12,
+    fontWeight: '700',
     marginTop: 4,
   },
 

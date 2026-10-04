@@ -1,5 +1,4 @@
-import { getAllCars } from '@/services/car-service';
-import { formatPricePerDay } from '@/utils/format-price';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ScrollView,
@@ -9,28 +8,44 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { getAllCars } from '@/services/car-service';
+import { formatPricePerDay } from '@/utils/format-price';
+
 const GOLD = '#D4AF37';
 
-const cars = getAllCars();
+const filters = ['Tất cả', 'Xe Sang', 'SUV', 'Tự lái', 'Xe cưới'];
 
-const filters = ['Tất cả', 'Xe sang', 'SUV', 'Tự lái', 'Xe cưới'];
 export default function ExploreScreen() {
+  const router = useRouter();
+
   const [selectedFilter, setSelectedFilter] = useState('Tất cả');
   const [search, setSearch] = useState('');
 
+  const cars = getAllCars();
+
   const filteredCars = cars.filter((car) => {
-const matchesFilter =
-  selectedFilter === 'Tất cả' ||
-  (selectedFilter === 'Tự lái'
-    ? car.serviceTypes.includes('Tự lái')
-    : car.category === selectedFilter);
+    const matchesFilter =
+      selectedFilter === 'Tất cả' ||
+      (selectedFilter === 'Tự lái'
+        ? car.serviceTypes.includes('Tự lái')
+        : selectedFilter === 'Xe cưới'
+          ? car.serviceTypes.includes('Xe cưới')
+          : car.category === selectedFilter);
 
     const matchesSearch = car.name
       .toLowerCase()
-      .includes(search.toLowerCase());
+      .includes(search.trim().toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
+
+  const openCarDetail = (carId: string) => {
+    router.push({
+      pathname: '/car/[id]',
+      params: { id: carId },
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -38,11 +53,15 @@ const matchesFilter =
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.logo}>EAGLE CARS</Text>
-        <Text style={styles.subtitle}>Chọn xe cho hành trình của bạn</Text>
+        <Text style={styles.logo}>EAGLE CAPITAL CARS</Text>
+
+        <Text style={styles.subtitle}>
+          Chọn xe cho hành trình của bạn
+        </Text>
 
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>⌕</Text>
+
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -83,32 +102,55 @@ const matchesFilter =
         </ScrollView>
 
         <View style={styles.headingRow}>
-          <Text style={styles.heading}>Danh sách xe</Text>
-          <Text style={styles.count}>{filteredCars.length} xe</Text>
+          <Text style={styles.heading}>
+            Danh sách xe
+          </Text>
+
+          <Text style={styles.count}>
+            {filteredCars.length} xe
+          </Text>
         </View>
 
         {filteredCars.map((car) => (
           <View key={car.id} style={styles.card}>
             <View style={styles.imageArea}>
-              <Text style={styles.carIcon}>{car.icon}</Text>
+              <Text style={styles.carIcon}>
+                {car.icon}
+              </Text>
 
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{car.category}</Text>
+                <Text style={styles.badgeText}>
+                  {car.category}
+                </Text>
               </View>
             </View>
 
             <View style={styles.cardContent}>
-              <Text style={styles.carName}>{car.name}</Text>
+              <Text style={styles.carName}>
+                {car.name}
+              </Text>
 
-              <Text style={styles.price}>{formatPricePerDay(car.pricePerDay)}</Text>
+              <Text style={styles.price}>
+                {formatPricePerDay(car.pricePerDay)}
+              </Text>
 
               <View style={styles.infoRow}>
-                <Text style={styles.info}>✓ Giao xe tận nơi</Text>
-                <Text style={styles.info}>✓ Hỗ trợ 24/7</Text>
+                <Text style={styles.info}>
+                  ✓ Hỗ trợ 24/7
+                </Text>
+
+                <Text style={styles.info}>
+                  ✓ Giao xe tận nơi
+                </Text>
               </View>
 
-              <TouchableOpacity style={styles.button}>
-                <Text style={styles.buttonText}>XEM XE</Text>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => openCarDetail(car.id)}
+              >
+                <Text style={styles.buttonText}>
+                  XEM XE
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -116,7 +158,10 @@ const matchesFilter =
 
         {filteredCars.length === 0 && (
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Không tìm thấy xe</Text>
+            <Text style={styles.emptyTitle}>
+              Không tìm thấy xe
+            </Text>
+
             <Text style={styles.emptyText}>
               Thử tìm kiếm bằng tên xe khác.
             </Text>

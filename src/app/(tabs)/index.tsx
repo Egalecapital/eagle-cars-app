@@ -1,12 +1,28 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-const cars = [
-  { name: 'Porsche Panamera', price: '4.500.000đ/ngày', icon: '🏎️' },
-  { name: 'BMW 530i M Sport', price: '2.500.000đ/ngày', icon: '🚘' },
-  { name: 'Mercedes E300 AMG', price: '2.000.000đ/ngày', icon: '🚙' },
-];
+import { getFeaturedCars } from '@/services/car-service';
+import { formatPricePerDay } from '@/utils/format-price';
+
+const GOLD = '#D4AF37';
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const cars = getFeaturedCars();
+
+  const openCarDetail = (carId: string) => {
+    router.push({
+      pathname: '/car/[id]',
+      params: { id: carId },
+    });
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -14,18 +30,21 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.brand}>EAGLE CARS</Text>
-          <Text style={styles.slogan}>Thuê xe • Nâng tầm hành trình</Text>
+          <Text style={styles.brand}>EAGLE CAPITAL CARS</Text>
+          <Text style={styles.slogan}>
+            THUÊ XE SANG • NÂNG TẦM TRẢI NGHIỆM
+          </Text>
         </View>
 
         <View style={styles.hero}>
           <Text style={styles.heroSmall}>EAGLE CAPITAL</Text>
+
           <Text style={styles.heroTitle}>
-            Bạn cần xe?{'\n'}Eagle Cars lo.
+            Bạn cần thuê xe?{'\n'}Hãy để Eagle Capital Cars lo.
           </Text>
 
           <Text style={styles.heroText}>
-            Xe sang • Tự lái • Có lái • Xe cưới
+            Xe Sang • Tự lái • Xe Cưới • Xe Trưng Bày Sự Kiện
           </Text>
 
           <TouchableOpacity style={styles.goldButton}>
@@ -33,19 +52,25 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Xe nổi bật</Text>
+        <Text style={styles.sectionTitle}>Xe Nổi Bật</Text>
 
         {cars.map((car) => (
-          <View style={styles.carCard} key={car.name}>
+          <View style={styles.carCard} key={car.id}>
             <View style={styles.carImage}>
               <Text style={styles.carIcon}>{car.icon}</Text>
             </View>
 
             <View style={styles.carInfo}>
               <Text style={styles.carName}>{car.name}</Text>
-              <Text style={styles.carPrice}>{car.price}</Text>
 
-              <TouchableOpacity style={styles.detailButton}>
+              <Text style={styles.carPrice}>
+                {formatPricePerDay(car.pricePerDay)}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.detailButton}
+                onPress={() => openCarDetail(car.id)}
+              >
                 <Text style={styles.detailButtonText}>Xem xe</Text>
               </TouchableOpacity>
             </View>
@@ -53,21 +78,24 @@ export default function HomeScreen() {
         ))}
 
         <View style={styles.contact}>
-          <Text style={styles.contactTitle}>Cần xe ngay hôm nay?</Text>
+          <Text style={styles.contactTitle}>
+            Cần xe ngay hôm nay?
+          </Text>
+
           <Text style={styles.contactText}>
-            Liên hệ Eagle Cars để được tư vấn nhanh.
+            Liên hệ Eagle Capital Luxury Cars để được tư vấn.
           </Text>
 
           <TouchableOpacity style={styles.contactButton}>
-            <Text style={styles.contactButtonText}>LIÊN HỆ EAGLE CARS</Text>
+            <Text style={styles.contactButtonText}>
+              LIÊN HỆ EAGLE CAPITAL LUXURY CARS
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
   );
 }
-
-const GOLD = '#D4AF37';
 
 const styles = StyleSheet.create({
   container: {

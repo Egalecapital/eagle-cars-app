@@ -82,6 +82,9 @@ const BACKEND_ERROR_MESSAGES: Record<string, string> = {
     'Bạn đang có 5 yêu cầu chờ xác nhận. Vui lòng chờ Eagle Capital liên hệ hoặc huỷ bớt yêu cầu cũ.',
   CAR_ALREADY_BOOKED:
     'Xe đã có lịch trong khoảng thời gian này. Vui lòng chọn thời gian hoặc xe khác.',
+  BOOKING_NOT_FOUND: 'Không tìm thấy yêu cầu này.',
+  BOOKING_NOT_CANCELLABLE:
+    'Yêu cầu không còn ở trạng thái Chờ xác nhận nên không thể tự hủy. Vui lòng liên hệ Eagle Capital.',
 };
 
 const NETWORK_ERROR_MESSAGE =
@@ -313,4 +316,23 @@ export function subscribeBookingRequests(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/**
+ * Khách tự huỷ yêu cầu đang chờ xác nhận (RPC cancel_my_booking_request, 0001).
+ * Chỉ pending → cancelled, chỉ đơn của chính mình (server kiểm tra).
+ */
+export async function cancelMyBookingRequest(id: string): Promise<BookingRequest> {
+  const { data, error } = await supabase.rpc('cancel_my_booking_request', {
+    p_booking_id: id,
+  });
+
+  if (error) {
+    throw fromPostgrestError(error);
+  }
+
+  const request = toBookingRequest(data as BookingRequestRow);
+  notify();
+
+  return request;
 }

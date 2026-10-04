@@ -7,20 +7,16 @@ import {
   TabTriggerSlotProps,
 } from 'expo-router/ui';
 
-import { SymbolView } from 'expo-symbols';
 import {
   Pressable,
   StyleSheet,
-  useColorScheme,
   View,
 } from 'react-native';
 
-import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import {
-  Colors,
   MaxContentWidth,
   Spacing,
 } from '@/constants/theme';
@@ -37,7 +33,7 @@ export default function AppTabs() {
             href="/"
             asChild
           >
-            <TabButton>Home</TabButton>
+            <TabButton>Trang chủ</TabButton>
           </TabTrigger>
 
           <TabTrigger
@@ -45,7 +41,7 @@ export default function AppTabs() {
             href="/explore"
             asChild
           >
-            <TabButton>Explore</TabButton>
+            <TabButton>Khám phá</TabButton>
           </TabTrigger>
 
           <TabTrigger
@@ -99,15 +95,6 @@ export function TabButton({
 export function CustomTabList(
   props: TabListProps
 ) {
-  const scheme = useColorScheme();
-
-  const colors =
-    Colors[
-      scheme === 'unspecified'
-        ? 'light'
-        : scheme
-    ];
-
   return (
     <View
       {...props}
@@ -121,32 +108,10 @@ export function CustomTabList(
           type="smallBold"
           style={styles.brandText}
         >
-          Expo Starter
+          Eagle Cars
         </ThemedText>
 
         {props.children}
-
-        <ExternalLink
-          href="https://docs.expo.dev"
-          asChild
-        >
-          <Pressable
-            style={styles.externalPressable}
-          >
-            <ThemedText type="link">
-              Docs
-            </ThemedText>
-
-            <SymbolView
-              tintColor={colors.text}
-              name={{
-                ios: 'arrow.up.right.square',
-                web: 'link',
-              }}
-              size={12}
-            />
-          </Pressable>
-        </ExternalLink>
       </ThemedView>
     </View>
   );
@@ -185,13 +150,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
-  },
-
-  externalPressable: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.one,
-    marginLeft: Spacing.three,
   },
 });

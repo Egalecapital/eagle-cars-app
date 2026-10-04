@@ -56,7 +56,11 @@ export default function HomeScreen() {
             Xe Sang • Tự lái • Có lái • Xe Cưới • Xe Trưng Bày Sự Kiện
           </Text>
 
-          <TouchableOpacity style={styles.goldButton}>
+          <TouchableOpacity
+            style={styles.goldButton}
+            activeOpacity={0.8}
+            onPress={() => router.navigate('/explore')}
+          >
             <Text style={styles.goldButtonText}>
               ĐẶT XE NGAY
             </Text>

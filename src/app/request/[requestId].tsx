@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import {
   Image,
   ScrollView,
@@ -11,6 +11,10 @@ import {
 
 import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { useBookingRequest } from '@/hooks/use-booking-requests';
+import {
+  BookingServiceError,
+  cancelMyBookingRequest,
+} from '@/services/booking-service';
 import { getCarById } from '@/services/car-service';
 import { formatDateTime } from '@/utils/format-date';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
@@ -29,6 +33,12 @@ export default function RequestDetailScreen() {
     : params.requestId;
 
   const { request, loading, error } = useBookingRequest(requestId);
+
+  // Huỷ 2 bước: bấm lần 1 hiện xác nhận, bấm lần 2 mới gửi.
+  const [cancelArmed, setCancelArmed] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+  const cancellingRef = useRef(false);
 
   if (loading) {
     return <View style={styles.container} />;
@@ -56,6 +66,33 @@ export default function RequestDetailScreen() {
   }
 
   const car = getCarById(request.carId);
+
+  const handleCancel = async () => {
+    if (!cancelArmed) {
+      setCancelArmed(true);
+      return;
+    }
+
+    if (cancellingRef.current) return;
+
+    cancellingRef.current = true;
+    setCancelling(true);
+    setCancelError('');
+
+    try {
+      await cancelMyBookingRequest(request.id);
+      setCancelArmed(false);
+    } catch (cancelErr) {
+      setCancelError(
+        cancelErr instanceof BookingServiceError
+          ? cancelErr.userMessage
+          : 'Chưa hủy được yêu cầu. Vui lòng thử lại.'
+      );
+    } finally {
+      cancellingRef.current = false;
+      setCancelling(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -165,6 +202,42 @@ export default function RequestDetailScreen() {
             </>
           )}
         </View>
+
+        {request.status === 'pending' && (
+          <View style={styles.cancelBox}>
+            {cancelArmed && (
+              <Text style={styles.cancelConfirmText}>
+                Bạn chắc chắn muốn hủy yêu cầu {request.bookingCode}? Thao tác này
+                không thể hoàn tác.
+              </Text>
+            )}
+
+            {!!cancelError && (
+              <Text style={styles.cancelErrorText}>{cancelError}</Text>
+            )}
+
+            <TouchableOpacity
+              style={[styles.cancelButton, cancelling && styles.cancelDisabled]}
+              activeOpacity={0.8}
+              onPress={handleCancel}
+              disabled={cancelling}
+            >
+              <Text style={styles.cancelButtonText}>
+                {cancelling
+                  ? 'ĐANG HỦY...'
+                  : cancelArmed
+                    ? 'XÁC NHẬN HỦY YÊU CẦU'
+                    : 'HỦY YÊU CẦU'}
+              </Text>
+            </TouchableOpacity>
+
+            {cancelArmed && !cancelling && (
+              <TouchableOpacity onPress={() => setCancelArmed(false)}>
+                <Text style={styles.keepText}>Không, giữ yêu cầu</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <Text style={styles.notice}>
           Gửi lúc {formatDateTime(request.createdAt)}. Đây là yêu cầu đặt xe;
@@ -408,5 +481,51 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center',
     marginTop: 18,
+  },
+
+  cancelBox: {
+    marginTop: 18,
+  },
+
+  cancelConfirmText: {
+    color: '#FFB4AE',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+  cancelErrorText: {
+    color: '#FF7B72',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+  cancelButton: {
+    borderWidth: 1.5,
+    borderColor: '#E5534B',
+    paddingVertical: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+
+  cancelDisabled: {
+    opacity: 0.6,
+  },
+
+  cancelButtonText: {
+    color: '#FF8A80',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+
+  keepText: {
+    color: GOLD,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 14,
   },
 });

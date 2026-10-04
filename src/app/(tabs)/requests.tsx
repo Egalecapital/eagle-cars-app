@@ -19,7 +19,7 @@ const GOLD = '#D4AF37';
 
 export default function MyRequestsScreen() {
   const router = useRouter();
-  const { requests, loading } = useMyBookingRequests();
+  const { requests, loading, error } = useMyBookingRequests();
 
   const openRequest = (requestId: string) => {
     router.push({
@@ -37,7 +37,13 @@ export default function MyRequestsScreen() {
         <Text style={styles.eyebrow}>EAGLE CAPITAL CARS</Text>
         <Text style={styles.title}>ĐƠN CỦA TÔI</Text>
 
-        {!loading && requests.length === 0 && (
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {!loading && !error && requests.length === 0 && (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <Text style={styles.emptyIconText}>🚘</Text>
@@ -78,10 +84,10 @@ export default function MyRequestsScreen() {
             ))}
 
             <Text style={styles.notice}>
-              Đơn ở trạng thái Chờ xác nhận chưa phải đặt xe được xác nhận
-              chính thức. Tổng tiền là giá dự kiến. Đơn hiện chỉ lưu tạm trên
-              thiết bị này, chưa gửi lên máy chủ và sẽ mất khi app được tắt
-              hẳn. Eagle Capital sẽ liên hệ để xác nhận.
+              {requests.some((request) => request.status === 'pending') &&
+                'Đơn ở trạng thái Chờ xác nhận chưa phải đặt xe được xác nhận chính thức; Eagle Capital sẽ liên hệ để xác nhận. '}
+              Tổng tiền hiển thị là giá dự kiến, giá chính thức do Eagle Capital
+              xác nhận.
             </Text>
           </>
         )}
@@ -125,7 +131,7 @@ function RequestCard({ request, onPress }: RequestCardProps) {
           <Text style={styles.serviceType}>{request.serviceType}</Text>
 
           <Text style={styles.requestCode} numberOfLines={1}>
-            Mã tạm: {request.id}
+            Mã: {request.bookingCode}
           </Text>
         </View>
       </View>
@@ -192,6 +198,21 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 6,
     marginBottom: 22,
+  },
+
+  errorBox: {
+    backgroundColor: '#2A1414',
+    borderWidth: 1,
+    borderColor: '#E5534B',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+
+  errorText: {
+    color: '#FFB4AE',
+    fontSize: 14,
+    lineHeight: 21,
   },
 
   empty: {

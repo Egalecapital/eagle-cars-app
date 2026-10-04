@@ -28,7 +28,7 @@ export default function RequestDetailScreen() {
     ? params.requestId[0]
     : params.requestId;
 
-  const { request, loading } = useBookingRequest(requestId);
+  const { request, loading, error } = useBookingRequest(requestId);
 
   if (loading) {
     return <View style={styles.container} />;
@@ -37,11 +37,12 @@ export default function RequestDetailScreen() {
   if (!request) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundTitle}>Không tìm thấy yêu cầu</Text>
+        <Text style={styles.notFoundTitle}>
+          {error ? 'Không tải được yêu cầu' : 'Không tìm thấy yêu cầu'}
+        </Text>
 
         <Text style={styles.notFoundText}>
-          Yêu cầu này không còn trên thiết bị. Dữ liệu tạm sẽ mất khi app được
-          tắt hẳn.
+          {error ?? 'Yêu cầu này không tồn tại hoặc không thuộc thiết bị này.'}
         </Text>
 
         <TouchableOpacity
@@ -72,7 +73,9 @@ export default function RequestDetailScreen() {
         <Text style={styles.eyebrow}>CHI TIẾT YÊU CẦU</Text>
 
         <View style={styles.headerRow}>
-          <Text style={styles.requestCode}>Mã yêu cầu tạm: {request.id}</Text>
+          <Text style={styles.requestCode}>
+            Mã yêu cầu: {request.bookingCode}
+          </Text>
           <BookingStatusBadge status={request.status} />
         </View>
 
@@ -130,10 +133,8 @@ export default function RequestDetailScreen() {
         </View>
 
         <Text style={styles.notice}>
-          Tạo lúc {formatDateTime(request.createdAt)}. Đây là yêu cầu đặt xe,
-          chưa phải đặt xe được xác nhận chính thức. Mã trên chỉ là mã tạm;
-          yêu cầu hiện chỉ lưu tạm trên thiết bị này, chưa được gửi lên máy
-          chủ.
+          Gửi lúc {formatDateTime(request.createdAt)}. Đây là yêu cầu đặt xe;
+          chỉ khi trạng thái là Đã xác nhận thì xe mới được giữ cho bạn.
         </Text>
       </ScrollView>
     </View>

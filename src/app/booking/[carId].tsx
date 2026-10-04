@@ -1,13 +1,14 @@
 import {
+    BookingServiceError,
     createBookingRequest,
-    updateBookingRequest,
 } from '@/services/booking-service';
 import { getCarById } from '@/services/car-service';
-import type { BookingRequestInput } from '@/types/booking';
+import type { BookingRequest, BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
+import { formatDateTime as formatIsoDateTime } from '@/utils/format-date';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
     Image,
     KeyboardAvoidingView,
@@ -172,12 +173,14 @@ export default function BookingScreen() {
 
   // Mốc "hiện tại" để kiểm tra giờ nhận xe; cập nhật lại mỗi lần bấm gửi.
   const [nowMs, setNowMs] = useState(getNowMs);
-  const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // ID của yêu cầu đã gửi từ màn hình này; gửi lại sau khi chỉnh sửa sẽ cập nhật, không tạo trùng.
-  const [requestId, setRequestId] = useState<string | undefined>();
+  // Chặn bấm gửi nhiều lần liên tiếp trước khi state kịp cập nhật.
+  const submittingRef = useRef(false);
+
+  // Yêu cầu đã được Supabase lưu và trả về (số liệu chính thức từ server).
+  const [savedRequest, setSavedRequest] = useState<BookingRequest | undefined>();
 
   if (!car) {
     return (
@@ -265,19 +268,17 @@ export default function BookingScreen() {
     if (
       !isValid ||
       (pickupAt && pickupAt.getTime() <= currentMs) ||
-      submitting ||
+      submittingRef.current ||
       !serviceType ||
       !pickupAt ||
-      !returnAt ||
-      !rentalDays ||
-      !totalPrice
+      !returnAt
     ) {
       return;
     }
 
+    // Giá, số ngày, tổng tiền, trạng thái, mã đơn do server tính.
     const input: BookingRequestInput = {
       carId: car.id,
-      carName: car.name,
       serviceType,
       pickupAt: pickupAt.toISOString(),
       returnAt: returnAt.toISOString(),
@@ -288,24 +289,41 @@ export default function BookingScreen() {
         phone: phone.trim(),
       },
       note: note.trim(),
-      pricePerDay: car.pricePerDay,
-      rentalDays,
-      estimatedTotal: totalPrice,
     };
 
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError('');
 
     try {
-      const saved =
-        (requestId && (await updateBookingRequest(requestId, input))) ||
-        (await createBookingRequest(input));
+      const saved = await createBookingRequest(input);
 
-      setRequestId(saved.id);
-      setSubmitted(true);
-    } catch {
-      setSubmitError('Chưa gửi được yêu cầu. Vui lòng thử lại.');
+      if (__DEV__) {
+        console.log('[Booking] Request submitted', {
+          bookingId: saved.id,
+          bookingCode: saved.bookingCode,
+          carId: saved.carId,
+          status: saved.status,
+        });
+      }
+
+      setSavedRequest(saved);
+    } catch (error) {
+      if (__DEV__) {
+        console.error('[Booking] Request failed', {
+          carId: car.id,
+          kind: error instanceof BookingServiceError ? error.kind : 'unknown',
+          code: error instanceof BookingServiceError ? error.code : undefined,
+        });
+      }
+
+      setSubmitError(
+        error instanceof BookingServiceError
+          ? error.userMessage
+          : 'Chưa gửi được yêu cầu. Vui lòng thử lại.'
+      );
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -327,7 +345,7 @@ export default function BookingScreen() {
     }
   };
 
-  if (submitted && serviceType && rentalDays && totalPrice) {
+  if (savedRequest) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -341,48 +359,56 @@ export default function BookingScreen() {
           <Text style={styles.successEyebrow}>EAGLE CAPITAL CARS</Text>
 
           <Text style={styles.successTitle}>
-            Cảm ơn {fullName.trim()}!
+            Cảm ơn {savedRequest.customer.fullName}!
           </Text>
 
           <Text style={styles.successText}>
-            Thông tin đặt xe của bạn đã được tổng hợp. Eagle Capital sẽ liên
-            hệ qua số{' '}
-            <Text style={styles.successHighlight}>{phone.trim()}</Text> để xác
-            nhận xe, giá chính thức và thủ tục thuê.
+            Yêu cầu đặt xe của bạn đã được gửi tới Eagle Capital. Chúng tôi sẽ
+            liên hệ qua số{' '}
+            <Text style={styles.successHighlight}>
+              {savedRequest.customer.phone}
+            </Text>{' '}
+            để xác nhận xe, giá chính thức và thủ tục thuê.
           </Text>
 
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>Tóm tắt yêu cầu</Text>
 
-            <SummaryRow label="Xe" value={car.name} />
-            <SummaryRow label="Hình thức" value={serviceType} />
+            <SummaryRow label="Mã yêu cầu" value={savedRequest.bookingCode} />
+            <SummaryRow label="Trạng thái" value="Chờ xác nhận" />
+            <SummaryRow label="Xe" value={savedRequest.carName} />
+            <SummaryRow label="Hình thức" value={savedRequest.serviceType} />
             <SummaryRow
               label="Nhận xe"
-              value={formatDateTime(schedule.pickupDate, schedule.pickupTime)}
+              value={formatIsoDateTime(savedRequest.pickupAt)}
             />
             <SummaryRow
               label="Trả xe"
-              value={formatDateTime(schedule.returnDate, schedule.returnTime)}
+              value={formatIsoDateTime(savedRequest.returnAt)}
             />
-            <SummaryRow label="Nơi nhận" value={pickupLocation.trim()} />
-            <SummaryRow label="Nơi trả" value={finalReturnLocation} />
-            <SummaryRow label="Số ngày" value={`${rentalDays} ngày`} />
+            <SummaryRow label="Nơi nhận" value={savedRequest.pickupLocation} />
+            <SummaryRow label="Nơi trả" value={savedRequest.returnLocation} />
+            <SummaryRow
+              label="Số ngày"
+              value={`${savedRequest.rentalDays} ngày`}
+            />
 
             <View style={styles.divider} />
 
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Tổng dự kiến</Text>
-              <Text style={styles.totalValue}>{formatVnd(totalPrice)}</Text>
+              <Text style={styles.totalValue}>
+                {formatVnd(savedRequest.estimatedTotal)}
+              </Text>
             </View>
           </View>
 
           <View style={styles.infoNotice}>
             <Text style={styles.infoNoticeText}>
-              Lưu ý: Ứng dụng hiện chưa kết nối hệ thống đặt xe trực tuyến, nên
-              yêu cầu này chưa được lưu lên máy chủ và chưa phát sinh thanh
-              toán. Yêu cầu được lưu tạm trong mục &quot;Đơn của tôi&quot; trên
-              thiết bị này và sẽ mất khi app được tắt hẳn. Xe chỉ được giữ sau
-              khi Eagle Capital xác nhận với bạn.
+              Lưu ý: Yêu cầu đang ở trạng thái Chờ xác nhận, chưa phải đặt xe
+              được xác nhận chính thức và chưa phát sinh thanh toán. Tổng tiền
+              là giá dự kiến. Xe chỉ được giữ sau khi Eagle Capital xác nhận với
+              bạn. Bạn có thể theo dõi yêu cầu trong mục &quot;Đơn của tôi&quot;.
             </Text>
           </View>
 
@@ -400,14 +426,6 @@ export default function BookingScreen() {
             onPress={goHome}
           >
             <Text style={styles.outlineButtonText}>VỀ TRANG CHỦ</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.outlineButton}
-            activeOpacity={0.8}
-            onPress={() => setSubmitted(false)}
-          >
-            <Text style={styles.outlineButtonText}>CHỈNH SỬA YÊU CẦU</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -700,7 +718,9 @@ export default function BookingScreen() {
           onPress={handleSubmit}
           disabled={submitting}
         >
-          <Text style={styles.bookingButtonText}>GỬI YÊU CẦU ĐẶT XE</Text>
+          <Text style={styles.bookingButtonText}>
+            {submitting ? 'ĐANG GỬI YÊU CẦU...' : 'GỬI YÊU CẦU ĐẶT XE'}
+          </Text>
         </TouchableOpacity>
 
         <Text style={styles.notice}>

@@ -5,10 +5,17 @@ import type { ServiceType } from '@/types/car';
  * và chi tiết yêu cầu.
  *
  * UI chỉ làm việc với các kiểu này thông qua booking-service.ts.
- * Khi có backend, chỉ cần đổi phần lưu trữ trong service, không đổi UI.
+ * Dữ liệu thật nằm ở bảng public.booking_requests trên Supabase.
  */
 
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+/** Khớp CHECK status trong supabase/migrations/0001_init.sql. */
+export type BookingStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'rejected'
+  | 'cancelled'
+  | 'completed'
+  | 'expired';
 
 export type BookingCustomer = {
   fullName: string;
@@ -16,10 +23,13 @@ export type BookingCustomer = {
 };
 
 export type BookingRequest = {
+  /** UUID do database tạo. */
   id: string;
+  /** Mã cho khách đọc, dạng EC-XXXXXXXX, do server tạo. */
+  bookingCode: string;
 
   carId: string;
-  /** Lưu lại tên xe tại thời điểm đặt, phòng khi dữ liệu xe thay đổi. */
+  /** Tên xe tại thời điểm đặt (snapshot phía server). */
   carName: string;
 
   serviceType: ServiceType;
@@ -34,22 +44,30 @@ export type BookingRequest = {
   customer: BookingCustomer;
   note: string;
 
-  /** Giá dự kiến phía app; giá chính thức do Eagle Capital xác nhận. */
+  /** Server tính từ bảng cars; giá chính thức do Eagle Capital xác nhận. */
   pricePerDay: number;
   rentalDays: number;
   estimatedTotal: number;
+  finalTotal: number | null;
 
   status: BookingStatus;
+  statusReason: string | null;
 
   createdAt: string;
   updatedAt: string;
 };
 
 /**
- * Dữ liệu app gửi đi khi tạo/cập nhật yêu cầu.
- * id, trạng thái và thời gian tạo do nơi lưu trữ (sau này là backend) cấp.
+ * Dữ liệu khách nhập, gửi lên RPC create_booking_request.
+ * KHÔNG có giá, số ngày, tổng tiền, trạng thái, mã đơn: server tự tính.
  */
-export type BookingRequestInput = Omit<
-  BookingRequest,
-  'id' | 'status' | 'createdAt' | 'updatedAt'
->;
+export type BookingRequestInput = {
+  carId: string;
+  serviceType: ServiceType;
+  pickupAt: string;
+  returnAt: string;
+  pickupLocation: string;
+  returnLocation: string;
+  customer: BookingCustomer;
+  note: string;
+};

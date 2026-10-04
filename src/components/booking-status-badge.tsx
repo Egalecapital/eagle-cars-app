@@ -34,6 +34,18 @@ export const BOOKING_STATUS_STYLES: Record<BookingStatus, StatusStyle> = {
     background: 'rgba(255, 138, 128, 0.1)',
     border: 'rgba(255, 138, 128, 0.45)',
   },
+  rejected: {
+    label: 'Đã từ chối',
+    color: '#FF8A80',
+    background: 'rgba(255, 138, 128, 0.1)',
+    border: 'rgba(255, 138, 128, 0.45)',
+  },
+  expired: {
+    label: 'Đã hết hạn',
+    color: '#9A9A9A',
+    background: 'rgba(154, 154, 154, 0.1)',
+    border: 'rgba(154, 154, 154, 0.4)',
+  },
 };
 
 type BookingStatusBadgeProps = {

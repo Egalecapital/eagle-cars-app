@@ -1,56 +1,52 @@
-# Welcome to your Expo app 👋
+# Eagle Capital Cars
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App đặt thuê xe sang của Eagle Capital (Expo / React Native, Expo Router, Supabase).
 
-## Get started
+- **Khách:** xem xe → đặt xe → "Đơn của tôi" (trạng thái, giá chính thức, lý do), tự hủy yêu cầu đang chờ.
+- **Admin** (`/admin`, hoặc nhấn giữ logo trên Trang chủ): đăng nhập email, danh sách đơn theo trạng thái,
+  xác nhận / từ chối / hoàn tất / hủy đơn.
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Chạy local
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env.local   # điền URL + publishable key của Supabase
+npx expo start               # quét QR bằng Expo Go, nhấn w để mở web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`.env.local` không được commit. Chỉ dùng **publishable key**; không bao giờ đưa `service_role` / secret key vào app.
 
-### Other setup steps
+## Kiểm tra
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npx tsc --noEmit
+npx expo lint
+npx expo-doctor
+```
 
-## Learn more
+## Database (Supabase)
 
-To learn more about developing your project with Expo, look at the following resources:
+Migration trong `supabase/migrations/`, chạy theo thứ tự (đã áp dụng trên Production):
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+| File | Nội dung |
+|---|---|
+| `0001_init.sql` | `cars`, `booking_requests`, RLS, chống trùng lịch, RPC tạo/hủy yêu cầu |
+| `0002_seed_cars.sql` | Dữ liệu xe ban đầu (`is_active` mặc định `false`) |
+| `0003_admin_access.sql` | `admin_users`, `is_admin()`, admin đọc mọi đơn |
+| `0004_booking_status_guard.sql` | Bảo vệ vòng đời trạng thái, lịch sử `booking_status_events` |
+| `0005_admin_booking_actions.sql` | Admin xác nhận / từ chối |
+| `0006_admin_complete_cancel_expire.sql` | Admin hoàn tất / hủy, đánh dấu hết hạn |
 
-## Join the community
+Nguyên tắc: app **không** ghi trực tiếp vào bảng; mọi thao tác ghi đi qua RPC (`security definer`,
+kiểm tra quyền bên trong). Không sửa migration đã chạy — thay đổi mới tạo file migration mới.
 
-Join our community of developers creating universal apps.
+Thêm admin: tạo user (email + mật khẩu) trong Supabase Authentication, rồi chạy trong SQL Editor:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```sql
+insert into public.admin_users (user_id, note)
+select u.id, 'Admin'
+from auth.users u
+where u.id = '<ADMIN_USER_UUID>'::uuid
+  and coalesce(u.is_anonymous, false) = false
+on conflict (user_id) do nothing;
+```

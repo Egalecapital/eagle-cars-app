@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,10 +17,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const cars = getFeaturedCars();
 
-  const openCarDetail = (carId: string) => {
+  const openCarDetail = (id: string) => {
     router.push({
       pathname: '/car/[id]',
-      params: { id: carId },
+      params: { id },
     });
   };
 
@@ -31,6 +32,7 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.brand}>EAGLE CAPITAL CARS</Text>
+
           <Text style={styles.slogan}>
             THUÊ XE SANG • NÂNG TẦM TRẢI NGHIỆM
           </Text>
@@ -44,34 +46,79 @@ export default function HomeScreen() {
           </Text>
 
           <Text style={styles.heroText}>
-            Xe Sang • Tự lái • Xe Cưới • Xe Trưng Bày Sự Kiện
+            Xe Sang • Tự lái • Có lái • Xe Cưới • Xe Trưng Bày Sự Kiện
           </Text>
 
           <TouchableOpacity style={styles.goldButton}>
-            <Text style={styles.goldButtonText}>ĐẶT XE NGAY</Text>
+            <Text style={styles.goldButtonText}>
+              ĐẶT XE NGAY
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Xe Nổi Bật</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Xe Nổi Bật
+          </Text>
+
+          <Text style={styles.sectionCount}>
+            {cars.length} xe
+          </Text>
+        </View>
 
         {cars.map((car) => (
-          <View style={styles.carCard} key={car.id}>
-            <View style={styles.carImage}>
-              <Text style={styles.carIcon}>{car.icon}</Text>
+          <View
+            style={styles.carCard}
+            key={car.id}
+          >
+            <View style={styles.carImageContainer}>
+              <Image
+                source={car.image}
+                style={styles.carImage}
+                resizeMode="cover"
+              />
+
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>
+                  {car.category}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.carInfo}>
-              <Text style={styles.carName}>{car.name}</Text>
+              <Text style={styles.carName}>
+                {car.name}
+              </Text>
+
+              <Text style={styles.carMeta}>
+                {car.year} • {car.seats} chỗ • {car.transmission}
+              </Text>
 
               <Text style={styles.carPrice}>
                 {formatPricePerDay(car.pricePerDay)}
               </Text>
 
+              <View style={styles.serviceRow}>
+                {car.serviceTypes.map((service) => (
+                  <View
+                    key={service}
+                    style={styles.serviceBadge}
+                  >
+                    <Text style={styles.serviceText}>
+                      {service}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
               <TouchableOpacity
                 style={styles.detailButton}
                 onPress={() => openCarDetail(car.id)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.detailButtonText}>Xem xe</Text>
+                <Text style={styles.detailButtonText}>
+                  XEM XE
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -83,12 +130,12 @@ export default function HomeScreen() {
           </Text>
 
           <Text style={styles.contactText}>
-            Liên hệ Eagle Capital Luxury Cars để được tư vấn.
+            Liên hệ Eagle Capital Cars để được tư vấn và lựa chọn chiếc xe phù hợp.
           </Text>
 
           <TouchableOpacity style={styles.contactButton}>
             <Text style={styles.contactButtonText}>
-              LIÊN HỆ EAGLE CAPITAL LUXURY CARS
+              LIÊN HỆ EAGLE CAPITAL CARS
             </Text>
           </TouchableOpacity>
         </View>
@@ -106,7 +153,7 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: 70,
     paddingHorizontal: 20,
-    paddingBottom: 80,
+    paddingBottom: 120,
   },
 
   header: {
@@ -123,7 +170,7 @@ const styles = StyleSheet.create({
   slogan: {
     color: '#AAAAAA',
     fontSize: 14,
-    marginTop: 4,
+    marginTop: 5,
   },
 
   hero: {
@@ -153,6 +200,7 @@ const styles = StyleSheet.create({
   heroText: {
     color: '#AAAAAA',
     fontSize: 15,
+    lineHeight: 22,
     marginTop: 14,
     marginBottom: 22,
   },
@@ -170,31 +218,57 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+
   sectionTitle: {
     color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 16,
+    fontSize: 25,
+    fontWeight: '900',
+  },
+
+  sectionCount: {
+    color: '#888888',
+    fontSize: 14,
   },
 
   carCard: {
     backgroundColor: '#151515',
     borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 18,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#292929',
   },
 
-  carImage: {
-    height: 145,
+  carImageContainer: {
+    height: 220,
     backgroundColor: '#202020',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
-  carIcon: {
-    fontSize: 65,
+  carImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  categoryBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    backgroundColor: GOLD,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+
+  categoryText: {
+    color: '#080808',
+    fontSize: 12,
+    fontWeight: '900',
   },
 
   carInfo: {
@@ -203,29 +277,57 @@ const styles = StyleSheet.create({
 
   carName: {
     color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+
+  carMeta: {
+    color: '#999999',
+    fontSize: 14,
+    marginTop: 7,
   },
 
   carPrice: {
     color: GOLD,
-    fontSize: 16,
+    fontSize: 19,
+    fontWeight: '900',
+    marginTop: 10,
+  },
+
+  serviceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+  },
+
+  serviceBadge: {
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: '#333333',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+
+  serviceText: {
+    color: '#BBBBBB',
+    fontSize: 12,
     fontWeight: '700',
-    marginTop: 7,
   },
 
   detailButton: {
-    marginTop: 15,
-    borderWidth: 1,
+    marginTop: 18,
+    borderWidth: 1.5,
     borderColor: GOLD,
-    paddingVertical: 11,
+    paddingVertical: 13,
     borderRadius: 12,
     alignItems: 'center',
   },
 
   detailButtonText: {
     color: GOLD,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 
   contact: {
@@ -244,6 +346,7 @@ const styles = StyleSheet.create({
   contactText: {
     color: '#222222',
     fontSize: 14,
+    lineHeight: 20,
     marginTop: 7,
     marginBottom: 18,
   },

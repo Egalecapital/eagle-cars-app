@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -7,10 +8,13 @@ import {
     View,
 } from 'react-native';
 
-import { getCarBenefits, getCarById } from '@/services/car-service';
+import {
+    getCarBenefits,
+    getCarById,
+} from '@/services/car-service';
 import { formatPricePerDay } from '@/utils/format-price';
 
-const GOLD = '#D9B94E';
+const GOLD = '#D4AF37';
 
 export default function CarDetailScreen() {
   const router = useRouter();
@@ -19,16 +23,20 @@ export default function CarDetailScreen() {
     id?: string | string[];
   }>();
 
-  const carId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const carId = Array.isArray(params.id)
+    ? params.id[0]
+    : params.id;
 
-  const car = carId ? getCarById(carId) : undefined;
-
-  const benefits: string[] = car ? getCarBenefits(car) : [];
+  const car = carId
+    ? getCarById(carId)
+    : undefined;
 
   if (!car) {
     return (
       <View style={styles.notFoundContainer}>
-        <Text style={styles.notFoundTitle}>Không tìm thấy xe</Text>
+        <Text style={styles.notFoundTitle}>
+          Không tìm thấy xe
+        </Text>
 
         <Text style={styles.notFoundText}>
           Xe này không tồn tại hoặc đường dẫn chưa đúng.
@@ -38,11 +46,15 @@ export default function CarDetailScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backButtonText}>QUAY LẠI</Text>
+          <Text style={styles.backButtonText}>
+            QUAY LẠI
+          </Text>
         </TouchableOpacity>
       </View>
     );
   }
+
+  const benefits = getCarBenefits(car);
 
   return (
     <ScrollView
@@ -50,66 +62,173 @@ export default function CarDetailScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>‹ Quay lại</Text>
+      <TouchableOpacity
+        style={styles.topBackButton}
+        onPress={() => router.back()}
+      >
+        <Text style={styles.back}>
+          ‹ Quay lại
+        </Text>
       </TouchableOpacity>
 
       <View style={styles.imageBox}>
-        <Text style={styles.carEmoji}>{car.icon}</Text>
+        <Image
+          source={car.image}
+          style={styles.carImage}
+          resizeMode="cover"
+        />
+
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryBadgeText}>
+            {car.category.toUpperCase()}
+          </Text>
+        </View>
       </View>
 
-      <Text style={styles.tag}>{car.category.toUpperCase()}</Text>
+      <Text style={styles.brand}>
+        {car.brand.toUpperCase()}
+      </Text>
 
-      <Text style={styles.name}>{car.name}</Text>
+      <Text style={styles.name}>
+        {car.name}
+      </Text>
 
       <Text style={styles.price}>
         {formatPricePerDay(car.pricePerDay)}
       </Text>
 
+      <Text style={styles.description}>
+        {car.description}
+      </Text>
+
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>Thông tin xe</Text>
+        <Text style={styles.infoTitle}>
+          Thông tin xe
+        </Text>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Dòng xe</Text>
-          <Text style={styles.infoValue}>{car.name}</Text>
-        </View>
+        <InfoRow
+          label="Thương hiệu"
+          value={car.brand}
+        />
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Phân loại</Text>
-          <Text style={styles.infoValue}>{car.category}</Text>
-        </View>
+        <InfoRow
+          label="Dòng xe"
+          value={car.model}
+        />
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Số chỗ</Text>
-          <Text style={styles.infoValue}>{car.seats} chỗ</Text>
-        </View>
+        <InfoRow
+          label="Năm sản xuất"
+          value={String(car.year)}
+        />
 
-        <View style={[styles.infoRow, styles.lastInfoRow]}>
-          <Text style={styles.infoLabel}>Dịch vụ</Text>
+        <InfoRow
+          label="Phân loại"
+          value={car.category}
+        />
+
+        <InfoRow
+          label="Số chỗ"
+          value={`${car.seats} chỗ`}
+        />
+
+        <InfoRow
+          label="Nhiên liệu"
+          value={car.fuelType}
+        />
+
+        <InfoRow
+          label="Hộp số"
+          value={car.transmission}
+        />
+
+        <View style={styles.lastInfoRow}>
+          <Text style={styles.infoLabel}>
+            Dịch vụ
+          </Text>
+
           <Text style={styles.infoValue}>
             {car.serviceTypes.join(' / ')}
           </Text>
         </View>
       </View>
 
-      <View style={styles.benefitBox}>
-        <Text style={styles.infoTitle}>Quyền lợi</Text>
+      <View style={styles.featureBox}>
+        <Text style={styles.infoTitle}>
+          Điểm nổi bật
+        </Text>
 
-        {benefits.map((benefit: string) => (
-          <Text key={benefit} style={styles.benefit}>
-            ✓ {benefit}
-          </Text>
+        {car.features.map((feature) => (
+          <View
+            key={feature}
+            style={styles.checkRow}
+          >
+            <Text style={styles.check}>
+              ✓
+            </Text>
+
+            <Text style={styles.checkText}>
+              {feature}
+            </Text>
+          </View>
         ))}
       </View>
 
-      <TouchableOpacity style={styles.bookingButton}>
-        <Text style={styles.bookingText}>ĐẶT XE NGAY</Text>
+      <View style={styles.benefitBox}>
+        <Text style={styles.infoTitle}>
+          Quyền lợi khi thuê xe
+        </Text>
+
+        {benefits.map((benefit) => (
+          <View
+            key={benefit}
+            style={styles.checkRow}
+          >
+            <Text style={styles.check}>
+              ✓
+            </Text>
+
+            <Text style={styles.checkText}>
+              {benefit}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <TouchableOpacity
+        style={styles.bookingButton}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.bookingText}>
+          ĐẶT XE NGAY
+        </Text>
       </TouchableOpacity>
 
       <Text style={styles.note}>
-        Eagle Capital Cars • Thuê xe sang - Nâng tầm hành trình
+        Eagle Capital Cars • Thuê xe sang • Nâng tầm hành trình
       </Text>
     </ScrollView>
+  );
+}
+
+type InfoRowProps = {
+  label: string;
+  value: string;
+};
+
+function InfoRow({
+  label,
+  value,
+}: InfoRowProps) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>
+        {label}
+      </Text>
+
+      <Text style={styles.infoValue}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -121,52 +240,81 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 20,
-    paddingTop: 70,
+    paddingTop: 65,
     paddingBottom: 100,
+  },
+
+  topBackButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 20,
   },
 
   back: {
     color: GOLD,
     fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 25,
+    fontWeight: '800',
   },
 
   imageBox: {
-    height: 270,
+    height: 280,
     backgroundColor: '#202020',
     borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#333333',
-    marginBottom: 25,
+    marginBottom: 24,
   },
 
-  carEmoji: {
-    fontSize: 100,
+  carImage: {
+    width: '100%',
+    height: '100%',
   },
 
-  tag: {
+  categoryBadge: {
+    position: 'absolute',
+    top: 15,
+    left: 15,
+    backgroundColor: GOLD,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+
+  categoryBadgeText: {
+    color: '#080808',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  brand: {
     color: GOLD,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     letterSpacing: 2,
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   name: {
     color: '#FFFFFF',
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '900',
-    marginBottom: 8,
+    lineHeight: 39,
   },
 
   price: {
     color: GOLD,
-    fontSize: 25,
+    fontSize: 24,
     fontWeight: '900',
-    marginBottom: 28,
+    marginTop: 8,
+  },
+
+  description: {
+    color: '#AAAAAA',
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 16,
+    marginBottom: 26,
   },
 
   infoBox: {
@@ -174,6 +322,24 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#303030',
+  },
+
+  featureBox: {
+    backgroundColor: '#151515',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#303030',
+  },
+
+  benefitBox: {
+    backgroundColor: '#151515',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 25,
     borderWidth: 1,
     borderColor: '#303030',
   },
@@ -196,35 +362,44 @@ const styles = StyleSheet.create({
   },
 
   lastInfoRow: {
-    borderBottomWidth: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 20,
+    paddingTop: 12,
   },
 
   infoLabel: {
-    color: '#999999',
-    fontSize: 15,
+    color: '#888888',
+    fontSize: 14,
   },
 
   infoValue: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'right',
   },
 
-  benefitBox: {
-    backgroundColor: '#151515',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: '#303030',
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
 
-  benefit: {
+  check: {
+    color: GOLD,
+    fontSize: 16,
+    fontWeight: '900',
+    marginRight: 10,
+  },
+
+  checkText: {
+    flex: 1,
     color: '#BBBBBB',
     fontSize: 15,
-    marginBottom: 12,
+    lineHeight: 21,
   },
 
   bookingButton: {
@@ -282,4 +457,3 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
-

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,15 +15,15 @@ import { formatPricePerDay } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
 
-const filters = ['Tất cả', 'Xe Sang', 'SUV', 'Tự lái', 'Xe cưới'];
+const cars = getAllCars();
+
+const filters = ['Tất cả', 'Xe sang', 'SUV', 'Sedan', 'Tự lái', 'Xe cưới'];
 
 export default function ExploreScreen() {
   const router = useRouter();
 
   const [selectedFilter, setSelectedFilter] = useState('Tất cả');
   const [search, setSearch] = useState('');
-
-  const cars = getAllCars();
 
   const filteredCars = cars.filter((car) => {
     const matchesFilter =
@@ -40,10 +41,10 @@ export default function ExploreScreen() {
     return matchesFilter && matchesSearch;
   });
 
-  const openCarDetail = (carId: string) => {
+  const openCarDetail = (id: string) => {
     router.push({
       pathname: '/car/[id]',
-      params: { id: carId },
+      params: { id },
     });
   };
 
@@ -53,7 +54,7 @@ export default function ExploreScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.logo}>EAGLE CAPITAL CARS</Text>
+        <Text style={styles.logo}>EAGLE CARS</Text>
 
         <Text style={styles.subtitle}>
           Chọn xe cho hành trình của bạn
@@ -102,9 +103,7 @@ export default function ExploreScreen() {
         </ScrollView>
 
         <View style={styles.headingRow}>
-          <Text style={styles.heading}>
-            Danh sách xe
-          </Text>
+          <Text style={styles.heading}>Danh sách xe</Text>
 
           <Text style={styles.count}>
             {filteredCars.length} xe
@@ -112,11 +111,16 @@ export default function ExploreScreen() {
         </View>
 
         {filteredCars.map((car) => (
-          <View key={car.id} style={styles.card}>
+          <View
+            key={car.id}
+            style={styles.card}
+          >
             <View style={styles.imageArea}>
-              <Text style={styles.carIcon}>
-                {car.icon}
-              </Text>
+              <Image
+                source={car.image}
+                style={styles.carImage}
+                resizeMode="cover"
+              />
 
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
@@ -130,23 +134,41 @@ export default function ExploreScreen() {
                 {car.name}
               </Text>
 
+              <Text style={styles.carMeta}>
+                {car.year} • {car.seats} chỗ • {car.transmission}
+              </Text>
+
               <Text style={styles.price}>
                 {formatPricePerDay(car.pricePerDay)}
               </Text>
 
+              <View style={styles.serviceRow}>
+                {car.serviceTypes.map((service) => (
+                  <View
+                    key={service}
+                    style={styles.serviceBadge}
+                  >
+                    <Text style={styles.serviceText}>
+                      {service}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
               <View style={styles.infoRow}>
                 <Text style={styles.info}>
-                  ✓ Hỗ trợ 24/7
+                  ✓ Giao xe tận nơi
                 </Text>
 
                 <Text style={styles.info}>
-                  ✓ Giao xe tận nơi
+                  ✓ Hỗ trợ 24/7
                 </Text>
               </View>
 
               <TouchableOpacity
                 style={styles.button}
                 onPress={() => openCarDetail(car.id)}
+                activeOpacity={0.8}
               >
                 <Text style={styles.buttonText}>
                   XEM XE
@@ -163,7 +185,7 @@ export default function ExploreScreen() {
             </Text>
 
             <Text style={styles.emptyText}>
-              Thử tìm kiếm bằng tên xe khác.
+              Thử tìm kiếm bằng tên xe khác hoặc chọn bộ lọc khác.
             </Text>
           </View>
         )}
@@ -278,14 +300,13 @@ const styles = StyleSheet.create({
   },
 
   imageArea: {
-    height: 190,
+    height: 220,
     backgroundColor: '#202020',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
-  carIcon: {
-    fontSize: 75,
+  carImage: {
+    width: '100%',
+    height: '100%',
   },
 
   badge: {
@@ -314,15 +335,44 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
+  carMeta: {
+    color: '#999999',
+    fontSize: 14,
+    marginTop: 7,
+  },
+
   price: {
     color: GOLD,
     fontSize: 19,
     fontWeight: '900',
-    marginTop: 7,
+    marginTop: 8,
+  },
+
+  serviceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 15,
+  },
+
+  serviceBadge: {
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: '#333333',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+
+  serviceText: {
+    color: '#BBBBBB',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   infoRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 18,
     marginTop: 15,
   },
@@ -361,6 +411,7 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#888888',
     marginTop: 8,
+    textAlign: 'center',
   },
 
   bottomSpace: {

@@ -1,3 +1,5 @@
+import { getCarBenefits, getCarById } from '@/services/car-service';
+import { formatPricePerDay } from '@/utils/format-price';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     Image,
@@ -8,12 +10,6 @@ import {
     View,
 } from 'react-native';
 
-import {
-    getCarBenefits,
-    getCarById,
-} from '@/services/car-service';
-import { formatPricePerDay } from '@/utils/format-price';
-
 const GOLD = '#D4AF37';
 
 export default function CarDetailScreen() {
@@ -23,32 +19,24 @@ export default function CarDetailScreen() {
     id?: string | string[];
   }>();
 
-  const carId = Array.isArray(params.id)
-    ? params.id[0]
-    : params.id;
+  const carId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  const car = carId
-    ? getCarById(carId)
-    : undefined;
+  const car = carId ? getCarById(carId) : undefined;
 
   if (!car) {
     return (
       <View style={styles.notFoundContainer}>
-        <Text style={styles.notFoundTitle}>
-          Không tìm thấy xe
-        </Text>
+        <Text style={styles.notFoundTitle}>Không tìm thấy xe</Text>
 
         <Text style={styles.notFoundText}>
-          Xe này không tồn tại hoặc đường dẫn chưa đúng.
+          Xe này không tồn tại hoặc hiện không còn trong danh sách.
         </Text>
 
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backButtonText}>
-            QUAY LẠI
-          </Text>
+          <Text style={styles.backButtonText}>QUAY LẠI</Text>
         </TouchableOpacity>
       </View>
     );
@@ -56,157 +44,127 @@ export default function CarDetailScreen() {
 
   const benefits = getCarBenefits(car);
 
+  const handleBooking = () => {
+    router.push({
+      pathname: '/booking/[carId]',
+      params: {
+        carId: car.id,
+      },
+    });
+  };
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity
-        style={styles.topBackButton}
-        onPress={() => router.back()}
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.back}>
-          ‹ Quay lại
-        </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.topBackButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.back}>← Quay lại</Text>
+        </TouchableOpacity>
 
-      <View style={styles.imageBox}>
-        <Image
-          source={car.image}
-          style={styles.carImage}
-          resizeMode="cover"
-        />
+        <View style={styles.imageBox}>
+          <Image
+            source={car.image}
+            style={styles.carImage}
+            resizeMode="cover"
+          />
 
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryBadgeText}>
-            {car.category.toUpperCase()}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.brand}>
-        {car.brand.toUpperCase()}
-      </Text>
-
-      <Text style={styles.name}>
-        {car.name}
-      </Text>
-
-      <Text style={styles.price}>
-        {formatPricePerDay(car.pricePerDay)}
-      </Text>
-
-      <Text style={styles.description}>
-        {car.description}
-      </Text>
-
-      <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>
-          Thông tin xe
-        </Text>
-
-        <InfoRow
-          label="Thương hiệu"
-          value={car.brand}
-        />
-
-        <InfoRow
-          label="Dòng xe"
-          value={car.model}
-        />
-
-        <InfoRow
-          label="Năm sản xuất"
-          value={String(car.year)}
-        />
-
-        <InfoRow
-          label="Phân loại"
-          value={car.category}
-        />
-
-        <InfoRow
-          label="Số chỗ"
-          value={`${car.seats} chỗ`}
-        />
-
-        <InfoRow
-          label="Nhiên liệu"
-          value={car.fuelType}
-        />
-
-        <InfoRow
-          label="Hộp số"
-          value={car.transmission}
-        />
-
-        <View style={styles.lastInfoRow}>
-          <Text style={styles.infoLabel}>
-            Dịch vụ
-          </Text>
-
-          <Text style={styles.infoValue}>
-            {car.serviceTypes.join(' / ')}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.featureBox}>
-        <Text style={styles.infoTitle}>
-          Điểm nổi bật
-        </Text>
-
-        {car.features.map((feature) => (
-          <View
-            key={feature}
-            style={styles.checkRow}
-          >
-            <Text style={styles.check}>
-              ✓
-            </Text>
-
-            <Text style={styles.checkText}>
-              {feature}
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryBadgeText}>
+              {car.category}
             </Text>
           </View>
-        ))}
-      </View>
+        </View>
 
-      <View style={styles.benefitBox}>
-        <Text style={styles.infoTitle}>
-          Quyền lợi khi thuê xe
+        <Text style={styles.brand}>EAGLE CAPITAL CARS</Text>
+
+        <Text style={styles.name}>{car.name}</Text>
+
+        <Text style={styles.price}>
+          {formatPricePerDay(car.pricePerDay)}
         </Text>
 
-        {benefits.map((benefit) => (
-          <View
-            key={benefit}
-            style={styles.checkRow}
-          >
-            <Text style={styles.check}>
-              ✓
-            </Text>
+        <Text style={styles.description}>
+          {car.description}
+        </Text>
 
-            <Text style={styles.checkText}>
-              {benefit}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>Thông tin xe</Text>
+
+          <InfoRow
+            label="Dòng xe"
+            value={car.category}
+          />
+
+          <InfoRow
+            label="Số chỗ"
+            value={`${car.seats} chỗ`}
+          />
+
+          <View style={styles.lastInfoRow}>
+            <Text style={styles.infoLabel}>Dịch vụ</Text>
+
+            <Text style={styles.infoValue}>
+              {car.serviceTypes.join(' • ')}
             </Text>
           </View>
-        ))}
-      </View>
+        </View>
 
-      <TouchableOpacity
-        style={styles.bookingButton}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.bookingText}>
-          ĐẶT XE NGAY
+        <View style={styles.featureBox}>
+          <Text style={styles.infoTitle}>Điểm nổi bật</Text>
+
+          {car.features.map((feature) => (
+            <View
+              key={feature}
+              style={styles.checkRow}
+            >
+              <Text style={styles.check}>✓</Text>
+
+              <Text style={styles.checkText}>
+                {feature}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.benefitBox}>
+          <Text style={styles.infoTitle}>
+            Quyền lợi khi thuê xe
+          </Text>
+
+          {benefits.map((benefit) => (
+            <View
+              key={benefit}
+              style={styles.checkRow}
+            >
+              <Text style={styles.check}>✓</Text>
+
+              <Text style={styles.checkText}>
+                {benefit}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={styles.bookingButton}
+          activeOpacity={0.8}
+          onPress={handleBooking}
+        >
+          <Text style={styles.bookingText}>
+            ĐẶT XE NGAY
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.note}>
+          Eagle Capital Cars • Thuê xe sang • Nâng tầm hành trình
         </Text>
-      </TouchableOpacity>
-
-      <Text style={styles.note}>
-        Eagle Capital Cars • Thuê xe sang • Nâng tầm hành trình
-      </Text>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -215,10 +173,7 @@ type InfoRowProps = {
   value: string;
 };
 
-function InfoRow({
-  label,
-  value,
-}: InfoRowProps) {
+function InfoRow({ label, value }: InfoRowProps) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>

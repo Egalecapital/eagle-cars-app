@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +24,9 @@ import { formatPricePerDay, formatVnd } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
 
+// Typed routes đôi khi chỉ sinh '/admin/index'; URL thật của danh sách đơn là '/admin'.
+const ADMIN_HOME = '/admin' as Href;
+
 type Action = 'confirm' | 'reject';
 
 export default function AdminRequestDetailScreen() {
@@ -43,6 +46,16 @@ export default function AdminRequestDetailScreen() {
   const [actionMessage, setActionMessage] = useState('');
   const busyRef = useRef(false);
 
+  // Trên web, trang chi tiết có thể được mở trực tiếp / tải lại → không có
+  // màn trước trong stack; khi đó về thẳng danh sách đơn thay vì GO_BACK.
+  const goBackToList = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(ADMIN_HOME);
+    }
+  };
+
   if (!ready || (loading && !request)) {
     return (
       <View style={styles.center}>
@@ -55,7 +68,7 @@ export default function AdminRequestDetailScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.notFound}>{error ?? 'Không tìm thấy đơn này.'}</Text>
-        <TouchableOpacity style={styles.outlineButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.outlineButton} onPress={goBackToList}>
           <Text style={styles.outlineButtonText}>QUAY LẠI</Text>
         </TouchableOpacity>
       </View>
@@ -119,7 +132,7 @@ export default function AdminRequestDetailScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={goBackToList}>
           <Text style={styles.backText}>← Danh sách đơn</Text>
         </TouchableOpacity>
 

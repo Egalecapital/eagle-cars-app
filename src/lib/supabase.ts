@@ -3,17 +3,17 @@
  *
  * Theo hướng dẫn chính thức của Expo (Using Supabase):
  * - Session đăng nhập được lưu qua localStorage do expo-sqlite cung cấp
- *   trên iOS/Android. Trên web, import này không làm gì và trình duyệt
- *   dùng localStorage có sẵn.
+ *   trên iOS/Android (auth-storage.ts). Web dùng localStorage của trình
+ *   duyệt (auth-storage.web.ts) để bundle web không kéo expo-sqlite.
  * - Expo đã có sẵn URL global nên không cần react-native-url-polyfill.
  *
  * Chỉ dùng publishable key (công khai được, an toàn khi RLS bật).
  * KHÔNG BAO GIỜ đưa service_role / secret key vào app.
  */
-import 'expo-sqlite/localStorage/install';
-
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
+
+import { authStorage } from '@/lib/auth-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -26,7 +26,7 @@ if (!supabaseUrl || !supabasePublishableKey) {
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
-    storage: localStorage,
+    storage: authStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

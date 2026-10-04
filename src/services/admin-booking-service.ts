@@ -29,6 +29,8 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   REASON_REQUIRED: 'Vui lòng nhập lý do từ chối (ít nhất 3 ký tự).',
   REASON_TOO_LONG: 'Lý do tối đa 500 ký tự.',
   INVALID_STATUS_TRANSITION: 'Không thể chuyển đơn sang trạng thái này.',
+  NOT_CONFIRMED: 'Chỉ đơn đã xác nhận mới thao tác được. Vui lòng tải lại.',
+  RENTAL_NOT_STARTED: 'Chưa tới giờ nhận xe, chưa thể hoàn tất đơn.',
 };
 
 const NETWORK_ERROR_MESSAGE =
@@ -86,6 +88,8 @@ export type AdminStatusFilter = BookingStatus | 'all';
 export async function listAdminBookingRequests(
   filter: AdminStatusFilter
 ): Promise<BookingRequest[]> {
+  await expireStaleBookingRequests();
+
   let query = supabase
     .from('booking_requests')
     .select(BOOKING_COLUMNS)
@@ -166,4 +170,49 @@ export async function rejectAdminBookingRequest(
   }
 
   return toBookingRequest(data as BookingRequestRow);
+}
+
+/**
+ * Hoàn tất đơn đã xác nhận (RPC 0006). Chỉ khi đã tới giờ nhận xe.
+ * note (tuỳ chọn) thay ghi chú hiện có; khách nhìn thấy.
+ */
+export async function completeAdminBookingRequest(
+  id: string,
+  note: string
+): Promise<BookingRequest> {
+  const { data, error } = await supabase.rpc('admin_complete_booking_request', {
+    p_booking_id: id,
+    p_note: note.trim() ? note.trim() : null,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return toBookingRequest(data as BookingRequestRow);
+}
+
+/** Huỷ đơn đã xác nhận (RPC 0006). reason bắt buộc, khách nhìn thấy. */
+export async function cancelAdminBookingRequest(
+  id: string,
+  reason: string
+): Promise<BookingRequest> {
+  const { data, error } = await supabase.rpc('admin_cancel_booking_request', {
+    p_booking_id: id,
+    p_reason: reason,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return toBookingRequest(data as BookingRequestRow);
+}
+
+/**
+ * Đánh dấu hết hạn các đơn pending đã quá giờ nhận (RPC 0006).
+ * Không chặn việc tải danh sách: lỗi (kể cả khi 0006 chưa chạy) bị bỏ qua.
+ */
+export async function expireStaleBookingRequests(): Promise<void> {
+  await supabase.rpc('expire_stale_booking_requests');
 }

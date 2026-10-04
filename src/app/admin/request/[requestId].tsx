@@ -16,6 +16,8 @@ import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { useAdminBookingRequest, useAdminGuard } from '@/hooks/use-admin';
 import {
   AdminBookingError,
+  cancelAdminBookingRequest,
+  completeAdminBookingRequest,
   confirmAdminBookingRequest,
   rejectAdminBookingRequest,
 } from '@/services/admin-booking-service';
@@ -27,7 +29,7 @@ const GOLD = '#D4AF37';
 // Typed routes đôi khi chỉ sinh '/admin/index'; URL thật của danh sách đơn là '/admin'.
 const ADMIN_HOME = '/admin' as Href;
 
-type Action = 'confirm' | 'reject';
+type Action = 'confirm' | 'reject' | 'complete' | 'cancel';
 
 export default function AdminRequestDetailScreen() {
   const router = useRouter();
@@ -41,6 +43,8 @@ export default function AdminRequestDetailScreen() {
   const [finalTotalText, setFinalTotalText] = useState('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
+  const [completeNote, setCompleteNote] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
   const [busy, setBusy] = useState<Action | undefined>();
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
@@ -76,6 +80,7 @@ export default function AdminRequestDetailScreen() {
   }
 
   const isPending = request.status === 'pending';
+  const isConfirmed = request.status === 'confirmed';
 
   const runAction = async (action: Action) => {
     if (busyRef.current) return;
@@ -101,6 +106,11 @@ export default function AdminRequestDetailScreen() {
       return;
     }
 
+    if (action === 'cancel' && cancelReason.trim().length < 3) {
+      setActionError('Vui lòng nhập lý do hủy đơn (ít nhất 3 ký tự).');
+      return;
+    }
+
     busyRef.current = true;
     setBusy(action);
 
@@ -108,9 +118,15 @@ export default function AdminRequestDetailScreen() {
       if (action === 'confirm') {
         await confirmAdminBookingRequest(request.id, finalTotal, note);
         setActionMessage('Đã xác nhận đơn.');
-      } else {
+      } else if (action === 'reject') {
         await rejectAdminBookingRequest(request.id, reason);
         setActionMessage('Đã từ chối đơn.');
+      } else if (action === 'complete') {
+        await completeAdminBookingRequest(request.id, completeNote);
+        setActionMessage('Đã hoàn tất đơn.');
+      } else {
+        await cancelAdminBookingRequest(request.id, cancelReason);
+        setActionMessage('Đã hủy đơn.');
       }
 
       reload();
@@ -243,6 +259,63 @@ export default function AdminRequestDetailScreen() {
               >
                 <Text style={styles.rejectButtonText}>
                   {busy === 'reject' ? 'ĐANG TỪ CHỐI...' : 'TỪ CHỐI'}
+                </Text>
+              </TouchableOpacity>
+            </Section>
+          </>
+        )}
+
+        {isConfirmed && (
+          <>
+            <Section title="Hoàn tất chuyến">
+              <Text style={styles.inputLabel}>
+                Chỉ hoàn tất được sau giờ nhận xe ({formatDateTime(request.pickupAt)}).
+                Ghi chú cho khách (tuỳ chọn, thay ghi chú hiện có)
+              </Text>
+              <TextInput
+                value={completeNote}
+                onChangeText={setCompleteNote}
+                placeholder="VD: Cảm ơn quý khách đã sử dụng dịch vụ"
+                placeholderTextColor="#666666"
+                multiline
+                maxLength={500}
+                textAlignVertical="top"
+                style={[styles.input, styles.multiline]}
+              />
+
+              <TouchableOpacity
+                style={[styles.goldButton, !!busy && styles.disabled]}
+                onPress={() => runAction('complete')}
+                disabled={!!busy}
+              >
+                <Text style={styles.goldButtonText}>
+                  {busy === 'complete' ? 'ĐANG HOÀN TẤT...' : 'HOÀN TẤT'}
+                </Text>
+              </TouchableOpacity>
+            </Section>
+
+            <Section title="Hủy đơn đã xác nhận">
+              <Text style={styles.inputLabel}>
+                Lý do hủy (khách sẽ nhìn thấy). Hủy sẽ giải phóng lịch xe.
+              </Text>
+              <TextInput
+                value={cancelReason}
+                onChangeText={setCancelReason}
+                placeholder="VD: Xe gặp sự cố kỹ thuật"
+                placeholderTextColor="#666666"
+                multiline
+                maxLength={500}
+                textAlignVertical="top"
+                style={[styles.input, styles.multiline]}
+              />
+
+              <TouchableOpacity
+                style={[styles.rejectButton, !!busy && styles.disabled]}
+                onPress={() => runAction('cancel')}
+                disabled={!!busy}
+              >
+                <Text style={styles.rejectButtonText}>
+                  {busy === 'cancel' ? 'ĐANG HỦY...' : 'HỦY ĐƠN'}
                 </Text>
               </TouchableOpacity>
             </Section>

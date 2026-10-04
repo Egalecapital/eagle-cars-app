@@ -262,6 +262,10 @@ export async function getMyBookingRequests(): Promise<BookingRequest[]> {
     return [];
   }
 
+  // Đơn pending đã quá giờ nhận → expired (RPC 0006, chỉ đơn của mình).
+  // Không chặn việc tải danh sách: lỗi ở đây được bỏ qua.
+  await supabase.rpc('expire_stale_booking_requests');
+
   const { data, error } = await supabase
     .from('booking_requests')
     .select(BOOKING_COLUMNS)

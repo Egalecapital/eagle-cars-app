@@ -126,7 +126,9 @@ export default function RequestDetailScreen() {
                 ? 'Lý do từ chối'
                 : request.status === 'cancelled'
                   ? 'Lý do hủy'
-                  : 'Ghi chú từ Eagle Capital'
+                  : request.status === 'expired'
+                    ? 'Lý do hết hạn'
+                    : 'Ghi chú từ Eagle Capital'
             }
           >
             <Text style={styles.noteText}>{request.statusReason}</Text>

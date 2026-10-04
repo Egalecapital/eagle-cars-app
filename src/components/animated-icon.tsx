@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -33,12 +33,13 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  // Nhận diện Eagle Capital: chữ vàng trên nền đen (thay bằng logo khi có file).
+  // Logo Eagle Capital gốc trên nền đen, giữ nguyên tỷ lệ (347 x 261).
   const image = (
-    <View style={styles.brandBlock}>
-      <Text style={styles.brandTitle}>EAGLE CAPITAL</Text>
-      <Text style={styles.brandSubtitle}>CARS</Text>
-    </View>
+    <Image
+      style={styles.brandLogo}
+      source={require('@/assets/images/brand/eagle-capital-logo.png')}
+      contentFit="contain"
+    />
   );
 
   return animate ? (
@@ -151,20 +152,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1000,
   },
-  brandBlock: {
-    alignItems: 'center',
-  },
-  brandTitle: {
-    color: '#D4AF37',
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: 3,
-  },
-  brandSubtitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 8,
-    marginTop: 6,
+  brandLogo: {
+    width: 220,
+    aspectRatio: 347 / 261,
   },
 });

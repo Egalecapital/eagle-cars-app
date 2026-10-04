@@ -1,18 +1,19 @@
 {
   "expo": {
-    "name": "eagle-cars-app",
+    "name": "Eagle Cars",
     "slug": "eagle-cars-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eaglecarsapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080808",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#080808",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -28,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#080808",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }

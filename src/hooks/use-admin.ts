@@ -10,6 +10,8 @@ import {
 } from '@/services/admin-booking-service';
 import type { BookingRequest } from '@/types/booking';
 
+const AUTO_REFRESH_MS = 60 * 1000;
+
 function toLoadError(error: unknown): string {
   return error instanceof AdminBookingError
     ? error.userMessage
@@ -58,10 +60,10 @@ export function useAdminBookingRequests(filter: AdminStatusFilter, enabled: bool
   const [error, setError] = useState<string | undefined>();
 
   const load = useCallback(
-    async (isActive: () => boolean) => {
+    async (isActive: () => boolean, silent = false) => {
       if (!enabled) return;
 
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       try {
         const data = await listAdminBookingRequests(filter);
@@ -84,8 +86,12 @@ export function useAdminBookingRequests(filter: AdminStatusFilter, enabled: bool
       let active = true;
       load(() => active);
 
+      // Chưa có thông báo đơn mới: khi màn hình đang mở, tự làm mới mỗi 60 giây.
+      const timer = setInterval(() => load(() => active, true), AUTO_REFRESH_MS);
+
       return () => {
         active = false;
+        clearInterval(timer);
       };
     }, [load])
   );

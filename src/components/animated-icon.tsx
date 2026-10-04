@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -33,7 +33,13 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  // Nhận diện Eagle Capital: chữ vàng trên nền đen (thay bằng logo khi có file).
+  const image = (
+    <View style={styles.brandBlock}>
+      <Text style={styles.brandTitle}>EAGLE CAPITAL</Text>
+      <Text style={styles.brandSubtitle}>CARS</Text>
+    </View>
+  );
 
   return animate ? (
     <Animated.View
@@ -140,9 +146,25 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#080808',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
+  },
+  brandBlock: {
+    alignItems: 'center',
+  },
+  brandTitle: {
+    color: '#D4AF37',
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
+  brandSubtitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 8,
+    marginTop: 6,
   },
 });

@@ -37,6 +37,9 @@ const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Khớp giới hạn của RPC create_booking_request (0001: tối đa 30 ngày).
+const MAX_RENTAL_DAYS = 30;
+
 type DateOption = {
   key: string;
   weekday: string;
@@ -227,7 +230,9 @@ export default function BookingScreen() {
         ? 'Vui lòng chọn đủ ngày và giờ trả xe.'
         : pickupAt && returnAt && returnAt <= pickupAt
           ? 'Thời gian trả xe phải sau thời gian nhận xe.'
-          : '',
+          : rentalDays && rentalDays > MAX_RENTAL_DAYS
+            ? `Mỗi yêu cầu chỉ được thuê tối đa ${MAX_RENTAL_DAYS} ngày.`
+            : '',
 
     pickupLocation: !pickupLocation.trim()
       ? 'Vui lòng nhập địa điểm nhận xe.'

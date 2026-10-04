@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { goBackOr } from '@/utils/navigation';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { useBookingRequest } from '@/hooks/use-booking-requests';
 import {
@@ -57,7 +58,7 @@ export default function RequestDetailScreen() {
 
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/requests')}
         >
           <Text style={styles.backButtonText}>QUAY LẠI</Text>
         </TouchableOpacity>
@@ -102,7 +103,7 @@ export default function RequestDetailScreen() {
       >
         <TouchableOpacity
           style={styles.topBackButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/requests')}
         >
           <Text style={styles.topBackText}>← Quay lại</Text>
         </TouchableOpacity>

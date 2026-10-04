@@ -2,6 +2,7 @@ import {
     BookingServiceError,
     createBookingRequest,
 } from '@/services/booking-service';
+import { goBackOr } from '@/utils/navigation';
 import { getCarById } from '@/services/car-service';
 import type { BookingRequest, BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
@@ -196,7 +197,7 @@ export default function BookingScreen() {
 
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/explore')}
         >
           <Text style={styles.backButtonText}>QUAY LẠI</Text>
         </TouchableOpacity>
@@ -449,7 +450,7 @@ export default function BookingScreen() {
       >
         <TouchableOpacity
           style={styles.topBackButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/explore')}
         >
           <Text style={styles.topBackText}>← Quay lại</Text>
         </TouchableOpacity>

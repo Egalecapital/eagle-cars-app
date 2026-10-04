@@ -1,3 +1,4 @@
+import { goBackOr } from '@/utils/navigation';
 import { getCarBenefits, getCarById } from '@/services/car-service';
 import { formatPricePerDay } from '@/utils/format-price';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -34,7 +35,7 @@ export default function CarDetailScreen() {
 
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/explore')}
         >
           <Text style={styles.backButtonText}>QUAY LẠI</Text>
         </TouchableOpacity>
@@ -61,7 +62,7 @@ export default function CarDetailScreen() {
       >
         <TouchableOpacity
           style={styles.topBackButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router, '/explore')}
         >
           <Text style={styles.back}>← Quay lại</Text>
         </TouchableOpacity>

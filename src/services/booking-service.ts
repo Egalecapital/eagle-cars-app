@@ -336,3 +336,33 @@ export async function cancelMyBookingRequest(id: string): Promise<BookingRequest
 
   return request;
 }
+
+/**
+ * Kiểm tra xe còn trống (RPC check_car_availability, 0009) — chỉ phục vụ UX.
+ * true = không trùng đơn confirmed; false = trùng.
+ * undefined = KHÔNG kiểm tra được (mất mạng, lỗi, 0009 chưa áp dụng…):
+ * app không được khoá form trong trường hợp này; backend vẫn quyết định cuối.
+ */
+export async function checkCarAvailability(
+  carId: string,
+  pickupAt: string,
+  returnAt: string
+): Promise<boolean | undefined> {
+  try {
+    await ensureSession();
+
+    const { data, error } = await supabase.rpc('check_car_availability', {
+      p_car_id: carId,
+      p_pickup_at: pickupAt,
+      p_return_at: returnAt,
+    });
+
+    if (error || typeof data !== 'boolean') {
+      return undefined;
+    }
+
+    return data;
+  } catch {
+    return undefined;
+  }
+}

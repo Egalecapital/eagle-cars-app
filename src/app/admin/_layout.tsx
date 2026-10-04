@@ -9,6 +9,7 @@ export default function AdminLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="calendar" />
       <Stack.Screen name="request/[requestId]" />
     </Stack>
   );

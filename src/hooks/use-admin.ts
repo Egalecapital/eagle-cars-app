@@ -4,9 +4,12 @@ import { useCallback, useState } from 'react';
 import { checkIsAdmin } from '@/services/admin-auth-service';
 import {
   AdminBookingError,
+  type AdminCar,
   type AdminStatusFilter,
   getAdminBookingRequest,
   listAdminBookingRequests,
+  listAdminCars,
+  listCarSchedule,
 } from '@/services/admin-booking-service';
 import type { BookingRequest } from '@/types/booking';
 
@@ -145,4 +148,89 @@ export function useAdminBookingRequest(id: string | undefined, enabled: boolean)
   }, [load]);
 
   return { request, loading, error, reload };
+}
+
+/** Danh sách xe cho màn Lịch xe. */
+export function useAdminCars(enabled: boolean) {
+  const [cars, setCars] = useState<AdminCar[]>([]);
+  const [error, setError] = useState<string | undefined>();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!enabled) return;
+
+      let active = true;
+
+      listAdminCars()
+        .then((data) => {
+          if (active) {
+            setCars(data);
+            setError(undefined);
+          }
+        })
+        .catch((loadError) => {
+          if (active) setError(toLoadError(loadError));
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [enabled])
+  );
+
+  return { cars, error };
+}
+
+/** Lịch của một xe trong [from, to); tải lại khi màn hình mở lại hoặc reload(). */
+export function useAdminCarSchedule(
+  carId: string | undefined,
+  from: Date,
+  to: Date,
+  enabled: boolean
+) {
+  const [requests, setRequests] = useState<BookingRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const fromMs = from.getTime();
+  const toMs = to.getTime();
+
+  const load = useCallback(
+    async (isActive: () => boolean) => {
+      if (!enabled || !carId) return;
+
+      setLoading(true);
+
+      try {
+        const data = await listCarSchedule(carId, new Date(fromMs), new Date(toMs));
+
+        if (isActive()) {
+          setRequests(data);
+          setError(undefined);
+        }
+      } catch (loadError) {
+        if (isActive()) setError(toLoadError(loadError));
+      } finally {
+        if (isActive()) setLoading(false);
+      }
+    },
+    [carId, fromMs, toMs, enabled]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      load(() => active);
+
+      return () => {
+        active = false;
+      };
+    }, [load])
+  );
+
+  const reload = useCallback(() => {
+    load(() => true);
+  }, [load]);
+
+  return { requests, loading, error, reload };
 }

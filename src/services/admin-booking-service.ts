@@ -216,3 +216,45 @@ export async function cancelAdminBookingRequest(
 export async function expireStaleBookingRequests(): Promise<void> {
   await supabase.rpc('expire_stale_booking_requests');
 }
+
+export type AdminCar = { id: string; name: string };
+
+/** Xe đang hoạt động (policy cars_select_active). */
+export async function listAdminCars(): Promise<AdminCar[]> {
+  const { data, error } = await supabase
+    .from('cars')
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return (data ?? []) as AdminCar[];
+}
+
+/**
+ * Lịch của một xe trong [from, to): đơn confirmed (giữ lịch) và pending
+ * (chưa giữ lịch). Admin đọc nhờ policy booking_requests_select_admin (0003).
+ */
+export async function listCarSchedule(
+  carId: string,
+  from: Date,
+  to: Date
+): Promise<BookingRequest[]> {
+  const { data, error } = await supabase
+    .from('booking_requests')
+    .select(BOOKING_COLUMNS)
+    .eq('car_id', carId)
+    .in('status', ['confirmed', 'pending'])
+    .gt('return_at', from.toISOString())
+    .lt('pickup_at', to.toISOString())
+    .order('pickup_at', { ascending: true })
+    .limit(500);
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return ((data ?? []) as unknown as BookingRequestRow[]).map(toBookingRequest);
+}

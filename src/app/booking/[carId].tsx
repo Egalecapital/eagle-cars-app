@@ -3,12 +3,20 @@ import {
     createBookingRequest,
 } from '@/services/booking-service';
 import { goBackOr } from '@/utils/navigation';
+import { useCarAvailability } from '@/hooks/use-car-availability';
 import { ContactInline } from '@/components/contact-inline';
 import { getCarById } from '@/services/car-service';
 import type { BookingRequest, BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
 import { formatDateTime as formatIsoDateTime } from '@/utils/format-date';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
+import {
+    addDaysToKey,
+    vnDateKey,
+    vnDayMonth,
+    vnWallTimeToDate,
+    vnWeekday,
+} from '@/utils/vn-time';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
@@ -35,8 +43,6 @@ const SERVICE_DESCRIPTIONS: Record<ServiceType, string> = {
 
 const BOOKING_DAYS_AHEAD = 60;
 
-const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // Khớp giới hạn của RPC create_booking_request (0001: tối đa 30 ngày).
@@ -56,24 +62,19 @@ type Schedule = {
 };
 
 /**
- * Tạo danh sách ngày có thể chọn, bắt đầu từ hôm nay.
- * key dạng "YYYY-MM-DD" theo giờ máy của khách.
+ * Tạo danh sách ngày có thể chọn, bắt đầu từ hôm nay THEO GIỜ VIỆT NAM.
+ * key dạng "YYYY-MM-DD" (giờ VN), không phụ thuộc múi giờ của thiết bị.
  */
 function buildDateOptions(): DateOption[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayKey = vnDateKey(new Date());
 
   return Array.from({ length: BOOKING_DAYS_AHEAD }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
-
-    const dd = String(date.getDate()).padStart(2, '0');
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const key = addDaysToKey(todayKey, index);
 
     return {
-      key: `${date.getFullYear()}-${mm}-${dd}`,
-      weekday: index === 0 ? 'Hôm nay' : WEEKDAYS[date.getDay()],
-      label: `${dd}/${mm}`,
+      key,
+      weekday: index === 0 ? 'Hôm nay' : vnWeekday(key),
+      label: vnDayMonth(key),
     };
   });
 }
@@ -97,15 +98,13 @@ function buildTimeOptions(): string[] {
 
 const TIME_OPTIONS = buildTimeOptions();
 
+/** Ngày + giờ khách chọn được hiểu là GIỜ VIỆT NAM → thời điểm tuyệt đối. */
 function toDateTime(dateKey: string, time: string): Date | undefined {
   if (!dateKey || !time) {
     return undefined;
   }
 
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const [hour, minute] = time.split(':').map(Number);
-
-  return new Date(year, month - 1, day, hour, minute);
+  return vnWallTimeToDate(dateKey, time);
 }
 
 function formatDateTime(dateKey: string, time: string): string {
@@ -187,6 +186,26 @@ export default function BookingScreen() {
   // Yêu cầu đã được Supabase lưu và trả về (số liệu chính thức từ server).
   const [savedRequest, setSavedRequest] = useState<BookingRequest | undefined>();
 
+  // Thời gian khách chọn (giờ VN → thời điểm tuyệt đối).
+  const pickupAt = toDateTime(schedule.pickupDate, schedule.pickupTime);
+  const returnAt = toDateTime(schedule.returnDate, schedule.returnTime);
+  const rentalDays = getRentalDays(pickupAt, returnAt);
+
+  // Chỉ kiểm tra xe trống khi khoảng thời gian đã hợp lệ (RPC 0009, chỉ UX).
+  const timesValid =
+    !!pickupAt &&
+    !!returnAt &&
+    returnAt > pickupAt &&
+    pickupAt.getTime() > nowMs &&
+    !!rentalDays &&
+    rentalDays <= MAX_RENTAL_DAYS;
+
+  const availability = useCarAvailability(
+    car?.id,
+    timesValid ? pickupAt.toISOString() : undefined,
+    timesValid ? returnAt.toISOString() : undefined
+  );
+
   if (!car) {
     return (
       <View style={styles.center}>
@@ -206,9 +225,6 @@ export default function BookingScreen() {
     );
   }
 
-  const pickupAt = toDateTime(schedule.pickupDate, schedule.pickupTime);
-  const returnAt = toDateTime(schedule.returnDate, schedule.returnTime);
-  const rentalDays = getRentalDays(pickupAt, returnAt);
   const totalPrice = rentalDays ? rentalDays * car.pricePerDay : undefined;
 
   const finalReturnLocation = sameReturnLocation
@@ -251,6 +267,12 @@ export default function BookingScreen() {
       ? 'Vui lòng nhập số điện thoại.'
       : phoneDigits.length < 9 || phoneDigits.length > 11
         ? 'Số điện thoại chưa đúng. Vui lòng kiểm tra lại.'
+        : '',
+
+    // Chỉ khoá khi CHẮC CHẮN trùng đơn confirmed; lỗi kiểm tra không khoá.
+    availability:
+      availability === 'unavailable'
+        ? 'Xe đã có lịch trong khoảng thời gian này. Vui lòng chọn thời gian khác.'
         : '',
   };
 
@@ -555,6 +577,21 @@ export default function BookingScreen() {
           />
 
           {fieldError(errors.returnAt)}
+
+          {availability === 'checking' && (
+            <Text style={styles.availabilityChecking}>Đang kiểm tra lịch xe…</Text>
+          )}
+          {availability === 'available' && (
+            <Text style={styles.availabilityOk}>
+              ✓ Xe còn trống trong khoảng thời gian này.
+            </Text>
+          )}
+          {availability === 'unavailable' && (
+            <Text style={styles.availabilityBusy}>
+              ⚠ Xe đã có lịch trong khoảng thời gian này. Vui lòng chọn thời gian
+              khác.
+            </Text>
+          )}
         </View>
 
         {/* D. Địa điểm */}
@@ -722,10 +759,13 @@ export default function BookingScreen() {
         )}
 
         <TouchableOpacity
-          style={[styles.bookingButton, submitting && styles.buttonDisabled]}
+          style={[
+            styles.bookingButton,
+            (submitting || availability === 'unavailable') && styles.buttonDisabled,
+          ]}
           activeOpacity={0.8}
           onPress={handleSubmit}
-          disabled={submitting}
+          disabled={submitting || availability === 'unavailable'}
         >
           <Text style={styles.bookingButtonText}>
             {submitting ? 'ĐANG GỬI YÊU CẦU...' : 'GỬI YÊU CẦU ĐẶT XE'}
@@ -1217,6 +1257,27 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+
+  availabilityChecking: {
+    color: '#999999',
+    fontSize: 13,
+    marginTop: 4,
+  },
+
+  availabilityOk: {
+    color: '#5CC98A',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+
+  availabilityBusy: {
+    color: '#FF7B72',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginTop: 4,
   },
 
   buttonDisabled: {

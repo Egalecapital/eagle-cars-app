@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +19,9 @@ import { formatDateTime } from '@/utils/format-date';
 import { formatVnd } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
+
+// Route mới; typed routes có thể chưa sinh lại kịp nên ép kiểu Href.
+const ADMIN_CALENDAR = '/admin/calendar' as Href;
 
 const FILTERS: { value: AdminStatusFilter; label: string }[] = [
   { value: 'pending', label: 'Chờ xác nhận' },
@@ -67,6 +70,14 @@ export default function AdminRequestsScreen() {
             <Text style={styles.signOutText}>Đăng xuất</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.calendarButton}
+          activeOpacity={0.8}
+          onPress={() => router.push(ADMIN_CALENDAR)}
+        >
+          <Text style={styles.calendarButtonText}>LỊCH XE</Text>
+        </TouchableOpacity>
 
         <ScrollView
           horizontal
@@ -166,6 +177,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   signOutText: { color: '#BBBBBB', fontSize: 13, fontWeight: '700' },
+  calendarButton: {
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  calendarButtonText: { color: GOLD, fontWeight: '900', letterSpacing: 0.5 },
   filters: { gap: 8, paddingVertical: 20 },
   filterChip: {
     paddingHorizontal: 14,

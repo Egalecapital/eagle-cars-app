@@ -36,7 +36,8 @@ Migration trong `supabase/migrations/`, chạy theo thứ tự (đã áp dụng 
 | `0004_booking_status_guard.sql` | Bảo vệ vòng đời trạng thái, lịch sử `booking_status_events` |
 | `0005_admin_booking_actions.sql` | Admin xác nhận / từ chối |
 | `0006_admin_complete_cancel_expire.sql` | Admin hoàn tất / hủy, đánh dấu hết hạn |
-| `0007_notify_new_booking.sql` | **Chưa áp dụng.** Báo đơn mới qua Telegram (pg_net + Vault) |
+| `0007_notify_new_booking.sql` | Báo đơn mới qua Telegram (pg_net + Vault: `telegram_bot_token`, `telegram_chat_id`) |
+| `0008_notify_new_booking_fix_url.sql` | Sửa hàm báo Telegram: làm sạch secret, không ghi lỗi chi tiết vào log |
 
 Nguyên tắc: app **không** ghi trực tiếp vào bảng; mọi thao tác ghi đi qua RPC (`security definer`,
 kiểm tra quyền bên trong). Không sửa migration đã chạy — thay đổi mới tạo file migration mới.

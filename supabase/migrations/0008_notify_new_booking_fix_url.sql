@@ -1,26 +1,24 @@
 -- =====================================================================
--- Eagle Capital Cars — 0007_notify_new_booking.sql
--- TRẠNG THÁI: ĐÃ ÁP DỤNG PRODUCTION. Hàm trigger được thay bởi 0008 (sửa URL + log).
+-- Eagle Capital Cars — 0008_notify_new_booking_fix_url.sql
 --
--- Thông báo đơn mới cho admin qua Telegram.
---   - Trigger AFTER INSERT trên booking_requests (đơn mới luôn ở pending).
---   - Gửi bằng pg_net: bất đồng bộ, CHỈ gửi sau khi transaction commit
---     (rollback → không gửi). Không làm chậm hay chặn việc tạo đơn.
---   - Bot token + chat id lưu trong Supabase Vault (mã hoá), KHÔNG nằm
---     trong app hay git. Chưa cấu hình → trigger bỏ qua, không lỗi.
---   - Mọi lỗi khi chuẩn bị thông báo bị nuốt (RAISE WARNING) → không bao
---     giờ làm hỏng create_booking_request.
+-- Sửa hàm trigger của 0007 (0007 đã chạy Production, không sửa file đó).
 --
--- Cấu hình sau khi có bot (chạy 1 lần trong SQL Editor, KHÔNG commit):
---   select vault.create_secret('<BOT_TOKEN>', 'telegram_bot_token', 'Telegram bot token');
---   select vault.create_secret('<CHAT_ID>',   'telegram_chat_id',   'Telegram chat id nhận đơn mới');
+-- Lỗi gặp phải: secret trong Vault có ký tự thừa (khoảng trắng / xuống
+-- dòng khi copy token) → URL 'https://api.telegram.org/bot<token>/sendMessage'
+-- bị pg_net báo "Malformed input to a URL function" → không gửi được.
+-- Ngoài ra 0007 ghi sqlerrm vào RAISE WARNING; thông báo lỗi của pg_net
+-- chứa URL (có token) → token có thể lọt vào log.
 --
--- Lưu ý dữ liệu: tin nhắn chứa tên + số điện thoại khách (để admin gọi
--- lại ngay) và được gửi tới Telegram. Chỉ đưa bot vào chat/nhóm nội bộ.
+-- Bản sửa:
+--   1. Cắt khoảng trắng / xuống dòng hai đầu token và chat id.
+--   2. Kiểm tra định dạng: token '<số>:<ký tự [A-Za-z0-9_-]>',
+--      chat id là số (có thể âm) hoặc '@tên_kênh'. Sai → bỏ qua, không gửi.
+--   3. Log CHỈ có SQLSTATE / mô tả chung — KHÔNG BAO GIỜ ghi sqlerrm,
+--      token hay chat id.
+--   4. Giữ nguyên: bất đồng bộ qua pg_net, chỉ gửi sau commit, mọi lỗi bị
+--      nuốt → không bao giờ làm khách đặt xe thất bại.
+-- Trigger booking_requests_notify_new (0007) giữ nguyên, tự dùng hàm mới.
 -- =====================================================================
-
-create extension if not exists pg_net with schema extensions;
-
 
 create or replace function public.notify_new_booking_request()
 returns trigger
@@ -44,8 +42,19 @@ begin
     from vault.decrypted_secrets ds
     where ds.name = 'telegram_chat_id';
 
-    -- Chưa cấu hình → bỏ qua.
-    if coalesce(v_token, '') = '' or coalesce(v_chat_id, '') = '' then
+    -- Ký tự thừa khi copy (space, tab, CR, LF) ở hai đầu.
+    v_token   := btrim(coalesce(v_token, ''),   E' \t\r\n');
+    v_chat_id := btrim(coalesce(v_chat_id, ''), E' \t\r\n');
+
+    -- Chưa cấu hình → bỏ qua, im lặng.
+    if v_token = '' or v_chat_id = '' then
+      return null;
+    end if;
+
+    -- Sai định dạng → bỏ qua; log KHÔNG chứa giá trị.
+    if v_token !~ '^[0-9]+:[A-Za-z0-9_-]+$'
+       or v_chat_id !~ '^(-?[0-9]+|@[A-Za-z0-9_]{5,})$' then
+      raise warning 'notify_new_booking_request: Telegram secret format invalid, skipped';
       return null;
     end if;
 
@@ -97,8 +106,8 @@ begin
     );
   exception
     when others then
-      -- Thông báo là phụ: không bao giờ chặn việc tạo đơn.
-      raise warning 'notify_new_booking_request skipped: %', sqlerrm;
+      -- KHÔNG ghi sqlerrm: lỗi của pg_net có thể chứa URL kèm token.
+      raise warning 'notify_new_booking_request failed (SQLSTATE %), skipped', sqlstate;
   end;
 
   return null;  -- AFTER trigger
@@ -109,17 +118,6 @@ revoke all on function public.notify_new_booking_request()
   from public, anon, authenticated;
 
 
-create trigger booking_requests_notify_new
-  after insert on public.booking_requests
-  for each row
-  when (new.status = 'pending')
-  execute function public.notify_new_booking_request();
-
-
 -- ---------------------------------------------------------------------
--- ROLLBACK THỦ CÔNG (KHÔNG tự chạy):
---   drop trigger if exists booking_requests_notify_new on public.booking_requests;
---   drop function if exists public.notify_new_booking_request();
---   -- (giữ extension pg_net; xoá secret nếu cần:
---   --  delete from vault.secrets where name in ('telegram_bot_token','telegram_chat_id');)
+-- ROLLBACK THỦ CÔNG (KHÔNG tự chạy): chạy lại phần CREATE FUNCTION của 0007.
 -- ---------------------------------------------------------------------

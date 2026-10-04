@@ -47,6 +47,14 @@ export default function AppTabs() {
           >
             <TabButton>Explore</TabButton>
           </TabTrigger>
+
+          <TabTrigger
+            name="requests"
+            href="/requests"
+            asChild
+          >
+            <TabButton>Yêu cầu</TabButton>
+          </TabTrigger>
         </CustomTabList>
       </TabList>
     </Tabs>

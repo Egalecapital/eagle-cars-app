@@ -1,4 +1,9 @@
+import {
+    createBookingRequest,
+    updateBookingRequest,
+} from '@/services/booking-service';
 import { getCarById } from '@/services/car-service';
+import type { BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
@@ -108,6 +113,13 @@ function formatDateTime(dateKey: string, time: string): string {
 }
 
 /**
+ * Thời điểm hiện tại (ms). Chỉ gọi trong state initializer hoặc event handler, không gọi khi render.
+ */
+function getNowMs(): number {
+  return Date.now();
+}
+
+/**
  * Số ngày thuê dự kiến: làm tròn lên theo mỗi 24 giờ, tối thiểu 1 ngày.
  */
 function getRentalDays(pickup?: Date, returnAt?: Date): number | undefined {
@@ -157,7 +169,15 @@ export default function BookingScreen() {
   const [note, setNote] = useState('');
 
   const [showErrors, setShowErrors] = useState(false);
+
+  // Mốc "hiện tại" để kiểm tra giờ nhận xe; cập nhật lại mỗi lần bấm gửi.
+  const [nowMs, setNowMs] = useState(getNowMs);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  // ID của yêu cầu đã gửi từ màn hình này; gửi lại sau khi chỉnh sửa sẽ cập nhật, không tạo trùng.
+  const [requestId, setRequestId] = useState<string | undefined>();
 
   if (!car) {
     return (
@@ -195,7 +215,7 @@ export default function BookingScreen() {
     pickup:
       !schedule.pickupDate || !schedule.pickupTime
         ? 'Vui lòng chọn đủ ngày và giờ nhận xe.'
-        : pickupAt && pickupAt.getTime() <= Date.now()
+        : pickupAt && pickupAt.getTime() <= nowMs
           ? 'Thời gian nhận xe phải sau thời điểm hiện tại.'
           : '',
 
@@ -236,14 +256,66 @@ export default function BookingScreen() {
     setSchedule((current) => ({ ...current, [field]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setShowErrors(true);
 
-    if (!isValid) {
+    const currentMs = getNowMs();
+    setNowMs(currentMs);
+
+    if (
+      !isValid ||
+      (pickupAt && pickupAt.getTime() <= currentMs) ||
+      submitting ||
+      !serviceType ||
+      !pickupAt ||
+      !returnAt ||
+      !rentalDays ||
+      !totalPrice
+    ) {
       return;
     }
 
-    setSubmitted(true);
+    const input: BookingRequestInput = {
+      carId: car.id,
+      carName: car.name,
+      serviceType,
+      pickupAt: pickupAt.toISOString(),
+      returnAt: returnAt.toISOString(),
+      pickupLocation: pickupLocation.trim(),
+      returnLocation: finalReturnLocation,
+      customer: {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+      },
+      note: note.trim(),
+      pricePerDay: car.pricePerDay,
+      rentalDays,
+      estimatedTotal: totalPrice,
+    };
+
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const saved =
+        (requestId && (await updateBookingRequest(requestId, input))) ||
+        (await createBookingRequest(input));
+
+      setRequestId(saved.id);
+      setSubmitted(true);
+    } catch {
+      setSubmitError('Chưa gửi được yêu cầu. Vui lòng thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const goToMyRequests = () => {
+    if (router.canDismiss()) {
+      router.dismissAll();
+    }
+
+    router.navigate('/requests');
   };
 
   // Quay về màn hình đầu stack (tabs). Nếu mở thẳng bằng deep link thì thay bằng trang chủ.
@@ -308,16 +380,26 @@ export default function BookingScreen() {
             <Text style={styles.infoNoticeText}>
               Lưu ý: Ứng dụng hiện chưa kết nối hệ thống đặt xe trực tuyến, nên
               yêu cầu này chưa được lưu lên máy chủ và chưa phát sinh thanh
-              toán. Xe chỉ được giữ sau khi Eagle Capital xác nhận với bạn.
+              toán. Yêu cầu được lưu tạm trong mục &quot;Yêu cầu của tôi&quot; trên
+              thiết bị này và sẽ mất khi app được tắt hẳn. Xe chỉ được giữ sau
+              khi Eagle Capital xác nhận với bạn.
             </Text>
           </View>
 
           <TouchableOpacity
             style={styles.bookingButton}
             activeOpacity={0.8}
+            onPress={goToMyRequests}
+          >
+            <Text style={styles.bookingButtonText}>XEM YÊU CẦU CỦA TÔI</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.outlineButton}
+            activeOpacity={0.8}
             onPress={goHome}
           >
-            <Text style={styles.bookingButtonText}>VỀ TRANG CHỦ</Text>
+            <Text style={styles.outlineButtonText}>VỀ TRANG CHỦ</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -606,10 +688,17 @@ export default function BookingScreen() {
         )}
 
         {/* H. Nút gửi */}
+        {!!submitError && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorBoxItem}>{submitError}</Text>
+          </View>
+        )}
+
         <TouchableOpacity
-          style={styles.bookingButton}
+          style={[styles.bookingButton, submitting && styles.buttonDisabled]}
           activeOpacity={0.8}
           onPress={handleSubmit}
+          disabled={submitting}
         >
           <Text style={styles.bookingButtonText}>GỬI YÊU CẦU ĐẶT XE</Text>
         </TouchableOpacity>
@@ -1099,6 +1188,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+
+  buttonDisabled: {
+    opacity: 0.6,
   },
 
   outlineButton: {

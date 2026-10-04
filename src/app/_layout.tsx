@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="car/[id]" />
         <Stack.Screen name="booking/[carId]" />
+        <Stack.Screen name="request/[requestId]" />
       </Stack>
     </>
   );

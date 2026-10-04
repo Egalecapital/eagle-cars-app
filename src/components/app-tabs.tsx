@@ -27,6 +27,14 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="requests">
+        <NativeTabs.Trigger.Label>Yêu cầu</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'doc.text', selected: 'doc.text.fill' }}
+          md="receipt_long"
+        />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

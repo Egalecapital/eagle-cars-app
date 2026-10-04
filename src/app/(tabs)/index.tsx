@@ -86,6 +86,18 @@ export default function HomeScreen() {
         {catalog.status === 'error' && <CatalogError onRetry={catalog.reload} />}
         {catalog.isStale && <CatalogStaleNotice fetchedAt={catalog.fetchedAt} />}
 
+        {catalog.status === 'ready' && cars.length === 0 && (
+          <TouchableOpacity
+            style={styles.emptyFeatured}
+            activeOpacity={0.8}
+            onPress={() => router.navigate('/explore')}
+          >
+            <Text style={styles.emptyFeaturedText}>
+              Chưa có xe nổi bật lúc này. <Text style={styles.emptyFeaturedLink}>Xem tất cả xe ›</Text>
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {cars.map((car) => (
           <View
             style={styles.carCard}
@@ -181,6 +193,27 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  emptyFeatured: {
+    backgroundColor: '#151515',
+    borderWidth: 1,
+    borderColor: '#303030',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 20,
+  },
+
+  emptyFeaturedText: {
+    color: '#AAAAAA',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+
+  emptyFeaturedLink: {
+    color: GOLD,
+    fontWeight: '900',
+  },
+
   container: {
     flex: 1,
     backgroundColor: '#080808',

@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -34,7 +35,7 @@ export default function RequestDetailScreen() {
     ? params.requestId[0]
     : params.requestId;
 
-  const { request, loading, error } = useBookingRequest(requestId);
+  const { request, loading, refreshing, error, reload } = useBookingRequest(requestId);
 
   // Huỷ 2 bước: bấm lần 1 hiện xác nhận, bấm lần 2 mới gửi.
   const [cancelArmed, setCancelArmed] = useState(false);
@@ -43,7 +44,11 @@ export default function RequestDetailScreen() {
   const cancellingRef = useRef(false);
 
   if (loading) {
-    return <View style={styles.container} />;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={GOLD} />
+      </View>
+    );
   }
 
   if (!request) {
@@ -56,6 +61,16 @@ export default function RequestDetailScreen() {
         <Text style={styles.notFoundText}>
           {error ?? 'Yêu cầu này không tồn tại hoặc không thuộc thiết bị này.'}
         </Text>
+
+        {!!error && (
+          <TouchableOpacity
+            style={[styles.backButton, styles.retryButton]}
+            onPress={reload}
+            disabled={refreshing}
+          >
+            <Text style={styles.backButtonText}>{refreshing ? 'ĐANG TẢI...' : 'THỬ LẠI'}</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.backButton}
@@ -315,6 +330,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
     marginBottom: 25,
+  },
+
+  retryButton: {
+    marginBottom: 12,
   },
 
   backButton: {

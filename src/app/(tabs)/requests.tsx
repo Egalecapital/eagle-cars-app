@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import {
+  ActivityIndicator,
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,7 +21,7 @@ const GOLD = '#D4AF37';
 
 export default function MyRequestsScreen() {
   const router = useRouter();
-  const { requests, loading, error } = useMyBookingRequests();
+  const { requests, loading, refreshing, error, reload } = useMyBookingRequests();
 
   const openRequest = (requestId: string) => {
     router.push({
@@ -33,13 +35,23 @@ export default function MyRequestsScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={GOLD} />
+        }
       >
         <Text style={styles.eyebrow}>EAGLE CAPITAL CARS</Text>
         <Text style={styles.title}>ĐƠN CỦA TÔI</Text>
 
+        {loading && requests.length === 0 && (
+          <ActivityIndicator color={GOLD} style={styles.loader} />
+        )}
+
         {!!error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={reload} disabled={refreshing}>
+              <Text style={styles.retryText}>{refreshing ? 'Đang tải lại...' : 'Thử lại'}</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -200,6 +212,16 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 6,
     marginBottom: 22,
+  },
+
+  loader: {
+    marginTop: 40,
+  },
+
+  retryText: {
+    color: GOLD,
+    fontWeight: '900',
+    marginTop: 8,
   },
 
   errorBox: {

@@ -3,6 +3,7 @@ import { type ReactNode, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,8 +13,15 @@ import {
   View,
 } from 'react-native';
 
+import { AdminNotificationCard } from '@/components/admin-notification-card';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
-import { useAdminBookingRequest, useAdminGuard } from '@/hooks/use-admin';
+import { BookingStatusTimeline } from '@/components/booking-status-timeline';
+import {
+  useAdminBookingRequest,
+  useAdminGuard,
+  useAdminNotifications,
+  useBookingStatusEvents,
+} from '@/hooks/use-admin';
 import {
   AdminBookingError,
   cancelAdminBookingRequest,
@@ -23,6 +31,7 @@ import {
 } from '@/services/admin-booking-service';
 import { formatDateTime } from '@/utils/format-date';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
+import { goBackOr } from '@/utils/navigation';
 
 const GOLD = '#D4AF37';
 
@@ -39,6 +48,8 @@ export default function AdminRequestDetailScreen() {
   const requestId = Array.isArray(params.requestId) ? params.requestId[0] : params.requestId;
 
   const { request, loading, error, reload } = useAdminBookingRequest(requestId, ready);
+  const history = useBookingStatusEvents(requestId, ready);
+  const telegram = useAdminNotifications('all', ready && !!request, request?.id);
 
   const [finalTotalText, setFinalTotalText] = useState('');
   const [note, setNote] = useState('');
@@ -52,13 +63,7 @@ export default function AdminRequestDetailScreen() {
 
   // Trên web, trang chi tiết có thể được mở trực tiếp / tải lại → không có
   // màn trước trong stack; khi đó về thẳng danh sách đơn thay vì GO_BACK.
-  const goBackToList = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace(ADMIN_HOME);
-    }
-  };
+  const goBackToList = () => goBackOr(router, ADMIN_HOME);
 
   if (!ready || (loading && !request)) {
     return (
@@ -81,6 +86,16 @@ export default function AdminRequestDetailScreen() {
 
   const isPending = request.status === 'pending';
   const isConfirmed = request.status === 'confirmed';
+  const finalTotalDigits = finalTotalText.replace(/\D/g, '');
+  const phoneDigits = request.customer.phone.replace(/[^\d+]/g, '');
+
+  const callCustomer = async () => {
+    try {
+      await Linking.openURL(`tel:${phoneDigits}`);
+    } catch {
+      setActionError(`Không mở được ứng dụng gọi điện. Số khách: ${request.customer.phone}`);
+    }
+  };
 
   const runAction = async (action: Action) => {
     if (busyRef.current) return;
@@ -130,6 +145,7 @@ export default function AdminRequestDetailScreen() {
       }
 
       reload();
+      history.reload();
     } catch (actionErr) {
       setActionError(
         actionErr instanceof AdminBookingError
@@ -171,6 +187,12 @@ export default function AdminRequestDetailScreen() {
           <Row label="Họ và tên" value={request.customer.fullName} />
           <Row label="Số điện thoại" value={request.customer.phone} />
           <Row label="Ghi chú" value={request.note || '—'} />
+
+          {phoneDigits.length >= 9 && (
+            <TouchableOpacity style={styles.callButton} onPress={callCustomer}>
+              <Text style={styles.callButtonText}>GỌI KHÁCH · {request.customer.phone}</Text>
+            </TouchableOpacity>
+          )}
         </Section>
 
         <Section title="Giá">
@@ -215,6 +237,9 @@ export default function AdminRequestDetailScreen() {
                 keyboardType="number-pad"
                 style={styles.input}
               />
+              {!!finalTotalDigits && (
+                <Text style={styles.preview}>Sẽ chốt: {formatVnd(Number(finalTotalDigits))}</Text>
+              )}
 
               <Text style={styles.inputLabel}>Ghi chú cho khách (tuỳ chọn)</Text>
               <TextInput
@@ -321,6 +346,29 @@ export default function AdminRequestDetailScreen() {
             </Section>
           </>
         )}
+
+        <Section title="Lịch sử thao tác">
+          <BookingStatusTimeline
+            events={history.events}
+            loading={history.loading}
+            error={history.error}
+            onRetry={history.reload}
+          />
+        </Section>
+
+        <Section title="Thông báo Telegram">
+          {!!telegram.error && <Text style={styles.mutedText}>{telegram.error}</Text>}
+          {!telegram.error && !telegram.loading && telegram.notifications.length === 0 && (
+            <Text style={styles.mutedText}>Đơn này không có thông báo Telegram.</Text>
+          )}
+          {telegram.notifications.map((notification) => (
+            <AdminNotificationCard
+              key={notification.id}
+              notification={notification}
+              onRetried={telegram.reload}
+            />
+          ))}
+        </Section>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -392,6 +440,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 80 },
+  preview: { color: '#5CC98A', fontSize: 13, marginTop: 6 },
+  mutedText: { color: '#888888', fontSize: 14, lineHeight: 20 },
+  callButton: {
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  callButtonText: { color: GOLD, fontWeight: '900' },
   goldButton: {
     backgroundColor: GOLD,
     paddingVertical: 16,

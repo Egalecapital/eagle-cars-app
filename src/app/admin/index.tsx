@@ -6,14 +6,20 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
 import { BookingStatusBadge } from '@/components/booking-status-badge';
-import { useAdminBookingRequests, useAdminGuard } from '@/hooks/use-admin';
+import {
+  useAdminBookingRequests,
+  useAdminBookingSearch,
+  useAdminGuard,
+  useNotificationSummary,
+} from '@/hooks/use-admin';
 import { signOutAdmin } from '@/services/admin-auth-service';
-import type { AdminStatusFilter } from '@/services/admin-booking-service';
+import { type AdminStatusFilter, SEARCH_RESULT_LIMIT } from '@/services/admin-booking-service';
 import type { BookingRequest } from '@/types/booking';
 import { formatDateTime } from '@/utils/format-date';
 import { formatVnd } from '@/utils/format-price';
@@ -23,6 +29,9 @@ const GOLD = '#D4AF37';
 // Route mới; typed routes có thể chưa sinh lại kịp nên ép kiểu Href.
 const ADMIN_CALENDAR = '/admin/calendar' as Href;
 const ADMIN_CARS = '/admin/cars' as Href;
+const ADMIN_NOTIFICATIONS = '/admin/notifications' as Href;
+
+const HOUR_MS = 60 * 60 * 1000;
 
 const FILTERS: { value: AdminStatusFilter; label: string }[] = [
   { value: 'pending', label: 'Chờ xác nhận' },
@@ -39,6 +48,19 @@ export default function AdminRequestsScreen() {
   const ready = useAdminGuard();
   const [filter, setFilter] = useState<AdminStatusFilter>('pending');
   const { requests, loading, error, reload } = useAdminBookingRequests(filter, ready);
+  const [query, setQuery] = useState('');
+  const search = useAdminBookingSearch(query, ready);
+  const { summary } = useNotificationSummary(ready);
+  // Mốc "bây giờ" cho nhãn GẤP; cập nhật khi kéo để làm mới.
+  const [now, setNow] = useState(() => Date.now());
+
+  const openRequest = (requestId: string) =>
+    router.push({ pathname: '/admin/request/[requestId]', params: { requestId } });
+
+  const refresh = () => {
+    setNow(Date.now());
+    reload();
+  };
 
   const handleSignOut = async () => {
     await signOutAdmin();
@@ -58,8 +80,9 @@ export default function AdminRequestsScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={reload} tintColor={GOLD} />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={GOLD} />
         }
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerRow}>
           <View>
@@ -88,71 +111,184 @@ export default function AdminRequestsScreen() {
           >
             <Text style={styles.calendarButtonText}>XE & GIÁ</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.calendarButton, summary.failed > 0 && styles.navButtonAlert]}
+            activeOpacity={0.8}
+            onPress={() => router.push(ADMIN_NOTIFICATIONS)}
+          >
+            <Text style={[styles.calendarButtonText, summary.failed > 0 && styles.navTextAlert]}>
+              {summary.failed > 0 ? `THÔNG BÁO (${summary.failed})` : 'THÔNG BÁO'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-        >
-          {FILTERS.map((item) => {
-            const active = item.value === filter;
+        {(summary.failed > 0 || summary.overduePending > 0) && (
+          <TouchableOpacity
+            style={styles.alertBanner}
+            activeOpacity={0.85}
+            onPress={() => router.push(ADMIN_NOTIFICATIONS)}
+          >
+            <Text style={styles.alertText}>
+              ⚠{' '}
+              {summary.failed > 0
+                ? `${summary.failed} thông báo Telegram gửi thất bại`
+                : `${summary.overduePending} thông báo Telegram chờ gửi quá 10 phút`}
+              {' — '}
+              <Text style={styles.alertLink}>Xem</Text>
+            </Text>
+          </TouchableOpacity>
+        )}
 
-            return (
-              <TouchableOpacity
-                key={item.value}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-                onPress={() => setFilter(item.value)}
-              >
-                <Text style={[styles.filterText, active && styles.filterTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Tìm mã EC, số điện thoại hoặc tên khách"
+            placeholderTextColor="#666666"
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+          {!!query && (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={10} style={styles.clearButton}>
+              <Text style={styles.clearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+        {search.status !== 'idle' ? (
+          <View style={styles.searchResults}>
+            <Text style={styles.searchHint}>Tìm trên tất cả trạng thái</Text>
+
+            {search.status === 'too-short' && (
+              <Text style={styles.empty}>
+                Nhập ít nhất 2 ký tự, hoặc 4 chữ số điện thoại (vd 4 số đuôi).
+              </Text>
+            )}
+
+            {search.status === 'loading' && <ActivityIndicator color={GOLD} style={styles.loader} />}
+
+            {search.status === 'error' && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{search.error}</Text>
+                <TouchableOpacity onPress={search.retry}>
+                  <Text style={styles.retryLink}>Thử lại</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {search.status === 'ready' && search.results.length === 0 && (
+              <Text style={styles.empty}>Không tìm thấy đơn khớp “{search.term}”.</Text>
+            )}
+
+            {search.status === 'ready' &&
+              search.results.map((request) => (
+                <AdminRequestCard
+                  key={request.id}
+                  request={request}
+                  now={now}
+                  onPress={() => openRequest(request.id)}
+                />
+              ))}
+
+            {search.status === 'ready' && search.results.length >= SEARCH_RESULT_LIMIT && (
+              <Text style={styles.searchHint}>
+                Đang hiện {SEARCH_RESULT_LIMIT} đơn mới nhất. Hãy nhập cụ thể hơn.
+              </Text>
+            )}
           </View>
-        )}
+        ) : (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filters}
+            >
+              {FILTERS.map((item) => {
+                const active = item.value === filter;
 
-        {!loading && !error && requests.length === 0 && (
-          <Text style={styles.empty}>Không có đơn nào trong mục này.</Text>
-        )}
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[styles.filterChip, active && styles.filterChipActive]}
+                    onPress={() => setFilter(item.value)}
+                  >
+                    <Text style={[styles.filterText, active && styles.filterTextActive]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-        {!error &&
-          requests.map((request) => (
-            <AdminRequestCard
-              key={request.id}
-              request={request}
-              onPress={() =>
-                router.push({
-                  pathname: '/admin/request/[requestId]',
-                  params: { requestId: request.id },
-                })
-              }
-            />
-          ))}
+            {!!error && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {!loading && !error && requests.length === 0 && (
+              <Text style={styles.empty}>Không có đơn nào trong mục này.</Text>
+            )}
+
+            {loading && !error && requests.length === 0 && (
+              <ActivityIndicator color={GOLD} style={styles.loader} />
+            )}
+
+            {!error &&
+              requests.map((request) => (
+                <AdminRequestCard
+                  key={request.id}
+                  request={request}
+                  now={now}
+                  onPress={() => openRequest(request.id)}
+                />
+              ))}
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
+/** Nhãn cho đơn chờ xác nhận sắp tới giờ nhận (≤ 24 giờ) hoặc đã quá giờ. */
+function pendingUrgency(request: BookingRequest, now: number): string | undefined {
+  if (request.status !== 'pending') return undefined;
+
+  const hours = (new Date(request.pickupAt).getTime() - now) / HOUR_MS;
+
+  if (hours <= 0) return 'QUÁ GIỜ NHẬN';
+  if (hours <= 24) return `GẤP · nhận trong ${hours < 1 ? '< 1' : Math.floor(hours)} giờ`;
+
+  return undefined;
+}
+
 function AdminRequestCard({
   request,
+  now,
   onPress,
 }: {
   request: BookingRequest;
+  now: number;
   onPress: () => void;
 }) {
+  const urgency = pendingUrgency(request, now);
+
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.card, !!urgency && styles.cardUrgent]}
+      activeOpacity={0.85}
+      onPress={onPress}
+    >
       <View style={styles.cardTop}>
         <Text style={styles.code}>{request.bookingCode}</Text>
         <BookingStatusBadge status={request.status} />
       </View>
+
+      {!!urgency && <Text style={styles.urgent}>{urgency}</Text>}
 
       <Text style={styles.carName}>{request.carName}</Text>
       <Text style={styles.meta}>
@@ -197,7 +333,50 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  calendarButtonText: { color: GOLD, fontWeight: '900', letterSpacing: 0.5 },
+  calendarButtonText: { color: GOLD, fontWeight: '900', letterSpacing: 0.5, fontSize: 13 },
+  navButtonAlert: { borderColor: '#E5534B', backgroundColor: 'rgba(229, 83, 75, 0.12)' },
+  navTextAlert: { color: '#FF8A80' },
+  alertBanner: {
+    backgroundColor: '#2A1414',
+    borderWidth: 1,
+    borderColor: '#E5534B',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 12,
+  },
+  alertText: { color: '#FFB4AE', fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  alertLink: { color: GOLD, fontWeight: '900', textDecorationLine: 'underline' },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: '#333333',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    marginTop: 14,
+  },
+  searchIcon: { color: GOLD, fontSize: 20, marginRight: 8 },
+  searchInput: { flex: 1, minHeight: 48, color: '#FFFFFF', fontSize: 15 },
+  clearButton: { paddingHorizontal: 6, paddingVertical: 4 },
+  clearText: { color: '#999999', fontSize: 16, fontWeight: '900' },
+  searchResults: { paddingTop: 14 },
+  searchHint: { color: '#888888', fontSize: 12, marginBottom: 12, textAlign: 'center' },
+  loader: { marginTop: 24 },
+  retryLink: { color: GOLD, fontWeight: '900', marginTop: 8 },
+  cardUrgent: { borderColor: GOLD },
+  urgent: {
+    color: '#080808',
+    backgroundColor: GOLD,
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
   filters: { gap: 8, paddingVertical: 20 },
   filterChip: {
     paddingHorizontal: 14,

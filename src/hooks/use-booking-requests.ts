@@ -16,90 +16,86 @@ function toLoadErrorMessage(error: unknown): string {
 }
 
 /**
- * Danh sách yêu cầu đặt xe của khách.
- * Tải lại mỗi khi màn hình được mở/quay lại và khi app vừa tạo yêu cầu mới.
+ * Tải dữ liệu khi màn hình được mở/quay lại và khi app vừa tạo / huỷ yêu cầu;
+ * reload() để tải lại thủ công (nút Thử lại, kéo để làm mới).
+ * `load` phải ổn định (useCallback).
  */
-export function useMyBookingRequests() {
-  const [requests, setRequests] = useState<BookingRequest[]>([]);
+function useCustomerResource<T>(load: () => Promise<T>, initial: T) {
+  const [data, setData] = useState<T>(initial);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | undefined>();
+
+  const run = useCallback(
+    async (isActive: () => boolean, manual = false) => {
+      if (manual) setRefreshing(true);
+
+      try {
+        const next = await load();
+
+        if (isActive()) {
+          setData(next);
+          setError(undefined);
+        }
+      } catch (loadError) {
+        if (isActive()) {
+          setError(toLoadErrorMessage(loadError));
+        }
+      } finally {
+        if (isActive()) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    },
+    [load]
+  );
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
 
-      const load = async () => {
-        try {
-          const data = await getMyBookingRequests();
-
-          if (active) {
-            setRequests(data);
-            setError(undefined);
-          }
-        } catch (loadError) {
-          if (active) {
-            setError(toLoadErrorMessage(loadError));
-          }
-        } finally {
-          if (active) {
-            setLoading(false);
-          }
-        }
-      };
-
-      load();
-      const unsubscribe = subscribeBookingRequests(load);
+      run(() => active);
+      const unsubscribe = subscribeBookingRequests(() => run(() => active));
 
       return () => {
         active = false;
         unsubscribe();
       };
-    }, [])
+    }, [run])
   );
 
-  return { requests, loading, error };
+  const reload = useCallback(() => {
+    run(() => true, true);
+  }, [run]);
+
+  return { data, loading, refreshing, error, reload };
+}
+
+/**
+ * Danh sách yêu cầu đặt xe của khách.
+ * Tải lại mỗi khi màn hình được mở/quay lại và khi app vừa tạo yêu cầu mới.
+ */
+export function useMyBookingRequests() {
+  const { data, loading, refreshing, error, reload } = useCustomerResource<BookingRequest[]>(
+    getMyBookingRequests,
+    []
+  );
+
+  return { requests: data, loading, refreshing, error, reload };
 }
 
 /**
  * Một yêu cầu đặt xe theo ID, tải lại mỗi khi màn hình được mở/quay lại.
  */
 export function useBookingRequest(id: string | undefined) {
-  const [request, setRequest] = useState<BookingRequest | undefined>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>();
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-
-      const load = async () => {
-        try {
-          const data = id ? await getBookingRequestById(id) : undefined;
-
-          if (active) {
-            setRequest(data);
-            setError(undefined);
-          }
-        } catch (loadError) {
-          if (active) {
-            setError(toLoadErrorMessage(loadError));
-          }
-        } finally {
-          if (active) {
-            setLoading(false);
-          }
-        }
-      };
-
-      load();
-      const unsubscribe = subscribeBookingRequests(load);
-
-      return () => {
-        active = false;
-        unsubscribe();
-      };
-    }, [id])
+  const load = useCallback(
+    () => (id ? getBookingRequestById(id) : Promise.resolve(undefined)),
+    [id]
   );
+  const { data, loading, refreshing, error, reload } = useCustomerResource<
+    BookingRequest | undefined
+  >(load, undefined);
 
-  return { request, loading, error };
+  return { request: data, loading, refreshing, error, reload };
 }

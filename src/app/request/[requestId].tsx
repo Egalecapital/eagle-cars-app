@@ -11,6 +11,7 @@ import {
 
 import { goBackOr } from '@/utils/navigation';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
+import { ContactInline } from '@/components/contact-inline';
 import { useBookingRequest } from '@/hooks/use-booking-requests';
 import {
   BookingServiceError,
@@ -239,6 +240,8 @@ export default function RequestDetailScreen() {
             )}
           </View>
         )}
+
+        <ContactInline label="Cần hỗ trợ về yêu cầu này?" />
 
         <Text style={styles.notice}>
           Gửi lúc {formatDateTime(request.createdAt)}. Đây là yêu cầu đặt xe;

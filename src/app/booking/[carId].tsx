@@ -3,6 +3,7 @@ import {
     createBookingRequest,
 } from '@/services/booking-service';
 import { goBackOr } from '@/utils/navigation';
+import { ContactInline } from '@/components/contact-inline';
 import { getCarById } from '@/services/car-service';
 import type { BookingRequest, BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
@@ -433,6 +434,8 @@ export default function BookingScreen() {
           >
             <Text style={styles.outlineButtonText}>VỀ TRANG CHỦ</Text>
           </TouchableOpacity>
+
+          <ContactInline label="Cần hỗ trợ gấp?" />
         </ScrollView>
       </View>
     );

@@ -8,7 +8,9 @@ import {
   View,
 } from 'react-native';
 
+import { CONTACT_PHONE_DISPLAY } from '@/constants/contact';
 import { getFeaturedCars } from '@/services/car-service';
+import { callEagleCapital, openEagleCapitalZalo } from '@/utils/contact';
 import { formatPricePerDay } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
@@ -144,11 +146,27 @@ export default function HomeScreen() {
             Liên hệ Eagle Capital Cars để được tư vấn và lựa chọn chiếc xe phù hợp.
           </Text>
 
-          <TouchableOpacity style={styles.contactButton}>
-            <Text style={styles.contactButtonText}>
-              LIÊN HỆ EAGLE CAPITAL CARS
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.contactPhone}>{CONTACT_PHONE_DISPLAY}</Text>
+
+          <View style={styles.contactActions}>
+            <TouchableOpacity
+              style={styles.contactButton}
+              activeOpacity={0.8}
+              onPress={callEagleCapital}
+            >
+              <Text style={styles.contactButtonText}>GỌI NGAY</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.contactButton, styles.zaloButton]}
+              activeOpacity={0.8}
+              onPress={openEagleCapitalZalo}
+            >
+              <Text style={[styles.contactButtonText, styles.zaloButtonText]}>
+                NHẮN ZALO
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -362,7 +380,21 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
+  contactPhone: {
+    color: '#080808',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
+
+  contactActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
   contactButton: {
+    flex: 1,
     backgroundColor: '#080808',
     paddingVertical: 15,
     borderRadius: 12,
@@ -372,5 +404,15 @@ const styles = StyleSheet.create({
   contactButtonText: {
     color: '#FFFFFF',
     fontWeight: '900',
+  },
+
+  zaloButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#080808',
+  },
+
+  zaloButtonText: {
+    color: '#080808',
   },
 });

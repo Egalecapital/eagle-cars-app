@@ -5,7 +5,8 @@ import {
 import { goBackOr } from '@/utils/navigation';
 import { useCarAvailability } from '@/hooks/use-car-availability';
 import { ContactInline } from '@/components/contact-inline';
-import { getCarById } from '@/services/car-service';
+import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
+import { useCatalogCar } from '@/hooks/use-car-catalog';
 import type { BookingRequest, BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
 import { formatDateTime as formatIsoDateTime } from '@/utils/format-date';
@@ -146,7 +147,14 @@ export default function BookingScreen() {
 
   const carId = Array.isArray(params.carId) ? params.carId[0] : params.carId;
 
-  const car = carId ? getCarById(carId) : undefined;
+  // Xe + giá từ danh mục Supabase; server vẫn tính giá chính thức khi gửi.
+  const {
+    car,
+    status: catalogStatus,
+    isStale: catalogIsStale,
+    fetchedAt: catalogFetchedAt,
+    reload: reloadCatalog,
+  } = useCatalogCar(carId);
 
   const availableServices = car
     ? ALL_SERVICE_TYPES.filter((type) => car.serviceTypes.includes(type))
@@ -206,13 +214,35 @@ export default function BookingScreen() {
     timesValid ? returnAt.toISOString() : undefined
   );
 
+  if (!car && catalogStatus === 'loading') {
+    return (
+      <View style={styles.center}>
+        <CatalogLoading />
+      </View>
+    );
+  }
+
+  if (!car && catalogStatus === 'error') {
+    return (
+      <View style={styles.center}>
+        <CatalogError onRetry={reloadCatalog} />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => goBackOr(router, '/explore')}
+        >
+          <Text style={styles.backButtonText}>QUAY LẠI</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!car) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFound}>Không tìm thấy xe</Text>
+        <Text style={styles.notFound}>Xe tạm ngừng nhận đặt</Text>
 
         <Text style={styles.notFoundText}>
-          Xe này không tồn tại hoặc hiện không còn trong danh sách.
+          Xe này hiện không nhận đặt hoặc không còn trong danh sách.
         </Text>
 
         <TouchableOpacity
@@ -482,6 +512,8 @@ export default function BookingScreen() {
 
         <Text style={styles.eyebrow}>EAGLE CAPITAL CARS</Text>
         <Text style={styles.title}>ĐẶT XE</Text>
+
+        {catalogIsStale && <CatalogStaleNotice fetchedAt={catalogFetchedAt} />}
 
         {/* A. Thông tin xe */}
         <View style={styles.carCard}>

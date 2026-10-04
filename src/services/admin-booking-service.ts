@@ -31,6 +31,9 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   INVALID_STATUS_TRANSITION: 'Không thể chuyển đơn sang trạng thái này.',
   NOT_CONFIRMED: 'Chỉ đơn đã xác nhận mới thao tác được. Vui lòng tải lại.',
   RENTAL_NOT_STARTED: 'Chưa tới giờ nhận xe, chưa thể hoàn tất đơn.',
+  INVALID_PRICE: 'Giá/ngày phải từ 1đ đến 1.000.000.000đ.',
+  INVALID_ACTIVE: 'Trạng thái cho thuê không hợp lệ.',
+  CAR_NOT_FOUND: 'Không tìm thấy xe này.',
 };
 
 const NETWORK_ERROR_MESSAGE =
@@ -217,20 +220,80 @@ export async function expireStaleBookingRequests(): Promise<void> {
   await supabase.rpc('expire_stale_booking_requests');
 }
 
-export type AdminCar = { id: string; name: string };
+export type AdminCar = {
+  id: string;
+  name: string;
+  pricePerDay: number;
+  isActive: boolean;
+  updatedAt: string;
+};
 
-/** Xe đang hoạt động (policy cars_select_active). */
+type AdminCarRow = {
+  id: string;
+  name: string;
+  price_per_day: number;
+  is_active: boolean;
+  updated_at: string;
+};
+
+const toAdminCar = (row: AdminCarRow): AdminCar => ({
+  id: row.id,
+  name: row.name,
+  pricePerDay: Number(row.price_per_day),
+  isActive: row.is_active,
+  updatedAt: row.updated_at,
+});
+
+/** Tất cả xe, kể cả đang tắt (policy cars_select_admin, 0011). */
 export async function listAdminCars(): Promise<AdminCar[]> {
   const { data, error } = await supabase
     .from('cars')
-    .select('id, name')
+    .select('id, name, price_per_day, is_active, updated_at')
     .order('name', { ascending: true });
 
   if (error) {
     throw toAdminError(error);
   }
 
-  return (data ?? []) as AdminCar[];
+  return ((data ?? []) as AdminCarRow[]).map(toAdminCar);
+}
+
+/** Số đơn ĐÃ XÁC NHẬN chưa kết thúc của một xe (để cảnh báo trước khi tắt xe). */
+export async function countUpcomingConfirmed(carId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('booking_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('car_id', carId)
+    .eq('status', 'confirmed')
+    .gt('return_at', new Date().toISOString());
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return count ?? 0;
+}
+
+/**
+ * Đổi giá / bật-tắt xe (RPC 0011). Không ảnh hưởng đơn đã tạo
+ * (mỗi đơn lưu price_per_day lúc đặt).
+ */
+export async function updateAdminCar(
+  carId: string,
+  pricePerDay: number,
+  isActive: boolean
+): Promise<AdminCar> {
+  const { data, error } = await supabase.rpc('admin_update_car', {
+    p_car_id: carId,
+    p_price_per_day: pricePerDay,
+    p_is_active: isActive,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return toAdminCar(data as AdminCarRow);
 }
 
 /**

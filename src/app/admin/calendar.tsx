@@ -116,6 +116,7 @@ export default function AdminCalendarScreen() {
               >
                 <Text style={[styles.carChipText, active && styles.carChipTextActive]}>
                   {car.name}
+                  {!car.isActive && ' (đang tắt)'}
                 </Text>
               </TouchableOpacity>
             );

@@ -8,8 +8,9 @@ import {
   View,
 } from 'react-native';
 
+import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
 import { CONTACT_PHONE_DISPLAY } from '@/constants/contact';
-import { getFeaturedCars } from '@/services/car-service';
+import { useCarCatalog } from '@/hooks/use-car-catalog';
 import { callEagleCapital, openEagleCapitalZalo } from '@/utils/contact';
 import { formatPricePerDay } from '@/utils/format-price';
 
@@ -17,7 +18,9 @@ const GOLD = '#D4AF37';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const cars = getFeaturedCars();
+  // Danh mục từ Supabase (xe active, tên, giá) + ảnh/mô tả trong app.
+  const catalog = useCarCatalog();
+  const cars = catalog.cars.filter((car) => car.isFeatured);
 
   const openCarDetail = (id: string) => {
     router.push({
@@ -78,6 +81,10 @@ export default function HomeScreen() {
             {cars.length} xe
           </Text>
         </View>
+
+        {catalog.status === 'loading' && <CatalogLoading />}
+        {catalog.status === 'error' && <CatalogError onRetry={catalog.reload} />}
+        {catalog.isStale && <CatalogStaleNotice fetchedAt={catalog.fetchedAt} />}
 
         {cars.map((car) => (
           <View

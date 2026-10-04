@@ -1,5 +1,7 @@
 import { goBackOr } from '@/utils/navigation';
-import { getCarBenefits, getCarById } from '@/services/car-service';
+import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
+import { useCatalogCar } from '@/hooks/use-car-catalog';
+import { getCarBenefits } from '@/services/car-service';
 import { formatPricePerDay } from '@/utils/format-price';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -22,15 +24,38 @@ export default function CarDetailScreen() {
 
   const carId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  const car = carId ? getCarById(carId) : undefined;
+  // Xe phải có trong danh mục đang cho thuê (Supabase quyết định).
+  const { car, status, isStale, fetchedAt, reload } = useCatalogCar(carId);
+
+  if (!car && status === 'loading') {
+    return (
+      <View style={styles.notFoundContainer}>
+        <CatalogLoading />
+      </View>
+    );
+  }
+
+  if (!car && status === 'error') {
+    return (
+      <View style={styles.notFoundContainer}>
+        <CatalogError onRetry={reload} />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => goBackOr(router, '/explore')}
+        >
+          <Text style={styles.backButtonText}>QUAY LẠI</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!car) {
     return (
       <View style={styles.notFoundContainer}>
-        <Text style={styles.notFoundTitle}>Không tìm thấy xe</Text>
+        <Text style={styles.notFoundTitle}>Xe tạm ngừng nhận đặt</Text>
 
         <Text style={styles.notFoundText}>
-          Xe này không tồn tại hoặc hiện không còn trong danh sách.
+          Xe này hiện không nhận đặt hoặc không còn trong danh sách.
         </Text>
 
         <TouchableOpacity
@@ -82,6 +107,8 @@ export default function CarDetailScreen() {
         </View>
 
         <Text style={styles.brand}>EAGLE CAPITAL CARS</Text>
+
+        {isStale && <CatalogStaleNotice fetchedAt={fetchedAt} />}
 
         <Text style={styles.name}>{car.name}</Text>
 

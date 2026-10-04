@@ -22,6 +22,7 @@ const GOLD = '#D4AF37';
 
 // Route mới; typed routes có thể chưa sinh lại kịp nên ép kiểu Href.
 const ADMIN_CALENDAR = '/admin/calendar' as Href;
+const ADMIN_CARS = '/admin/cars' as Href;
 
 const FILTERS: { value: AdminStatusFilter; label: string }[] = [
   { value: 'pending', label: 'Chờ xác nhận' },
@@ -71,13 +72,23 @@ export default function AdminRequestsScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.calendarButton}
-          activeOpacity={0.8}
-          onPress={() => router.push(ADMIN_CALENDAR)}
-        >
-          <Text style={styles.calendarButtonText}>LỊCH XE</Text>
-        </TouchableOpacity>
+        <View style={styles.navRow}>
+          <TouchableOpacity
+            style={styles.calendarButton}
+            activeOpacity={0.8}
+            onPress={() => router.push(ADMIN_CALENDAR)}
+          >
+            <Text style={styles.calendarButtonText}>LỊCH XE</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.calendarButton}
+            activeOpacity={0.8}
+            onPress={() => router.push(ADMIN_CARS)}
+          >
+            <Text style={styles.calendarButtonText}>XE & GIÁ</Text>
+          </TouchableOpacity>
+        </View>
 
         <ScrollView
           horizontal
@@ -177,13 +188,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   signOutText: { color: '#BBBBBB', fontSize: 13, fontWeight: '700' },
+  navRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   calendarButton: {
+    flex: 1,
     borderWidth: 1.5,
     borderColor: GOLD,
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
-    marginTop: 16,
   },
   calendarButtonText: { color: GOLD, fontWeight: '900', letterSpacing: 0.5 },
   filters: { gap: 8, paddingVertical: 20 },

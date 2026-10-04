@@ -150,35 +150,48 @@ export function useAdminBookingRequest(id: string | undefined, enabled: boolean)
   return { request, loading, error, reload };
 }
 
-/** Danh sách xe cho màn Lịch xe. */
+/** Tất cả xe (kể cả đang tắt) cho Lịch xe và Xe & giá. */
 export function useAdminCars(enabled: boolean) {
   const [cars, setCars] = useState<AdminCar[]>([]);
   const [error, setError] = useState<string | undefined>();
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(
+    async (isActive: () => boolean) => {
+      if (!enabled) return;
+
+      try {
+        const data = await listAdminCars();
+
+        if (isActive()) {
+          setCars(data);
+          setError(undefined);
+        }
+      } catch (loadError) {
+        if (isActive()) setError(toLoadError(loadError));
+      } finally {
+        if (isActive()) setLoading(false);
+      }
+    },
+    [enabled]
+  );
 
   useFocusEffect(
     useCallback(() => {
-      if (!enabled) return;
-
       let active = true;
-
-      listAdminCars()
-        .then((data) => {
-          if (active) {
-            setCars(data);
-            setError(undefined);
-          }
-        })
-        .catch((loadError) => {
-          if (active) setError(toLoadError(loadError));
-        });
+      load(() => active);
 
       return () => {
         active = false;
       };
-    }, [enabled])
+    }, [load])
   );
 
-  return { cars, error };
+  const reload = useCallback(() => {
+    load(() => true);
+  }, [load]);
+
+  return { cars, error, loading, reload };
 }
 
 /** Lịch của một xe trong [from, to); tải lại khi màn hình mở lại hoặc reload(). */

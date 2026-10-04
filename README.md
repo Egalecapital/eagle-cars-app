@@ -40,6 +40,10 @@ Migration trong `supabase/migrations/`, chạy theo thứ tự (đã áp dụng 
 | `0008_notify_new_booking_fix_url.sql` | Sửa hàm báo Telegram: làm sạch secret, không ghi lỗi chi tiết vào log |
 | `0009_car_availability.sql` | `check_car_availability` cho khách (chỉ trả boolean, chỉ confirmed giữ lịch) |
 | `0010_notification_outbox.sql` | Outbox thông báo + `pg_cron` mỗi phút (job `eagle-notification-outbox`) đối soát và gửi lại Telegram khi lỗi |
+| `0011_car_catalog_admin.sql` | Danh mục xe từ Supabase (anon đọc xe active), admin xem cả xe tắt, RPC `admin_update_car` (giá / bật-tắt) |
+
+Danh mục xe: Supabase (`public.cars`) quyết định xe nào đang cho thuê, tên và giá; `src/data/cars.ts`
+chỉ bổ sung ảnh / mô tả. Xe có trong database nhưng chưa có dữ liệu trong `cars.ts` sẽ chưa hiển thị.
 
 Nguyên tắc: app **không** ghi trực tiếp vào bảng; mọi thao tác ghi đi qua RPC (`security definer`,
 kiểm tra quyền bên trong). Không sửa migration đã chạy — thay đổi mới tạo file migration mới.

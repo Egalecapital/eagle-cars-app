@@ -10,12 +10,11 @@ import {
   View,
 } from 'react-native';
 
-import { getAllCars } from '@/services/car-service';
+import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
+import { useCarCatalog } from '@/hooks/use-car-catalog';
 import { formatPricePerDay } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
-
-const cars = getAllCars();
 
 const filters = ['Tất cả', 'Xe sang', 'SUV', 'Sedan', 'Tự lái', 'Xe cưới'];
 
@@ -25,7 +24,10 @@ export default function ExploreScreen() {
   const [selectedFilter, setSelectedFilter] = useState('Tất cả');
   const [search, setSearch] = useState('');
 
-  const filteredCars = cars.filter((car) => {
+  // Danh mục từ Supabase (xe active, tên, giá) + ảnh/mô tả trong app.
+  const catalog = useCarCatalog();
+
+  const filteredCars = catalog.cars.filter((car) => {
     const matchesFilter =
       selectedFilter === 'Tất cả' ||
       (selectedFilter === 'Tự lái'
@@ -110,6 +112,10 @@ export default function ExploreScreen() {
           </Text>
         </View>
 
+        {catalog.status === 'loading' && <CatalogLoading />}
+        {catalog.status === 'error' && <CatalogError onRetry={catalog.reload} />}
+        {catalog.isStale && <CatalogStaleNotice fetchedAt={catalog.fetchedAt} />}
+
         {filteredCars.map((car) => (
           <View
             key={car.id}
@@ -178,7 +184,7 @@ export default function ExploreScreen() {
           </View>
         ))}
 
-        {filteredCars.length === 0 && (
+        {catalog.status === 'ready' && filteredCars.length === 0 && (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
               Không tìm thấy xe

@@ -1,0 +1,357 @@
+import { useState } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+const GOLD = '#D4AF37';
+
+const cars = [
+  {
+    id: 1,
+    name: 'Porsche Panamera',
+    category: 'Xe sang',
+    price: '4.500.000đ/ngày',
+    icon: '🏎️',
+  },
+  {
+    id: 2,
+    name: 'BMW 530i M Sport',
+    category: 'Xe sang',
+    price: '3.000.000đ/ngày',
+    icon: '🚘',
+  },
+  {
+    id: 3,
+    name: 'Mercedes E300 AMG',
+    category: 'Xe sang',
+    price: '2.500.000đ/ngày',
+    icon: '🚙',
+  },
+  {
+    id: 4,
+    name: 'Mercedes GLC200',
+    category: 'SUV',
+    price: '2.300.000đ/ngày',
+    icon: '🚗',
+  },
+  {
+    id: 5,
+    name: 'VinFast Lux A',
+    category: 'Tự lái',
+    price: '1.200.000đ/ngày',
+    icon: '🚘',
+  },
+];
+
+const filters = ['Tất cả', 'Xe sang', 'SUV', 'Tự lái', 'Xe cưới'];
+
+export default function ExploreScreen() {
+  const [selectedFilter, setSelectedFilter] = useState('Tất cả');
+  const [search, setSearch] = useState('');
+
+  const filteredCars = cars.filter((car) => {
+    const matchesFilter =
+      selectedFilter === 'Tất cả' || car.category === selectedFilter;
+
+    const matchesSearch = car.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    return matchesFilter && matchesSearch;
+  });
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.logo}>EAGLE CARS</Text>
+        <Text style={styles.subtitle}>Chọn xe cho hành trình của bạn</Text>
+
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Tìm Porsche, BMW, Mercedes..."
+            placeholderTextColor="#777777"
+            style={styles.searchInput}
+          />
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+        >
+          {filters.map((filter) => {
+            const active = selectedFilter === filter;
+
+            return (
+              <TouchableOpacity
+                key={filter}
+                onPress={() => setSelectedFilter(filter)}
+                style={[
+                  styles.filterButton,
+                  active && styles.filterButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    active && styles.filterTextActive,
+                  ]}
+                >
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.headingRow}>
+          <Text style={styles.heading}>Danh sách xe</Text>
+          <Text style={styles.count}>{filteredCars.length} xe</Text>
+        </View>
+
+        {filteredCars.map((car) => (
+          <View key={car.id} style={styles.card}>
+            <View style={styles.imageArea}>
+              <Text style={styles.carIcon}>{car.icon}</Text>
+
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{car.category}</Text>
+              </View>
+            </View>
+
+            <View style={styles.cardContent}>
+              <Text style={styles.carName}>{car.name}</Text>
+
+              <Text style={styles.price}>{car.price}</Text>
+
+              <View style={styles.infoRow}>
+                <Text style={styles.info}>✓ Giao xe tận nơi</Text>
+                <Text style={styles.info}>✓ Hỗ trợ 24/7</Text>
+              </View>
+
+              <TouchableOpacity style={styles.button}>
+                <Text style={styles.buttonText}>XEM XE</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+
+        {filteredCars.length === 0 && (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>Không tìm thấy xe</Text>
+            <Text style={styles.emptyText}>
+              Thử tìm kiếm bằng tên xe khác.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#080808',
+  },
+
+  content: {
+    paddingTop: 70,
+    paddingHorizontal: 20,
+  },
+
+  logo: {
+    color: GOLD,
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  subtitle: {
+    color: '#999999',
+    fontSize: 16,
+    marginTop: 5,
+    marginBottom: 25,
+  },
+
+  searchBox: {
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#303030',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+
+  searchIcon: {
+    color: GOLD,
+    fontSize: 26,
+    marginRight: 10,
+  },
+
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+
+  filters: {
+    paddingVertical: 20,
+    gap: 10,
+  },
+
+  filterButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 30,
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+
+  filterButtonActive: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+  },
+
+  filterText: {
+    color: '#AAAAAA',
+    fontWeight: '700',
+  },
+
+  filterTextActive: {
+    color: '#080808',
+  },
+
+  headingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+
+  heading: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '900',
+  },
+
+  count: {
+    color: '#888888',
+    fontSize: 14,
+  },
+
+  card: {
+    overflow: 'hidden',
+    backgroundColor: '#141414',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#303030',
+    marginBottom: 20,
+  },
+
+  imageArea: {
+    height: 190,
+    backgroundColor: '#202020',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  carIcon: {
+    fontSize: 75,
+  },
+
+  badge: {
+    position: 'absolute',
+    top: 15,
+    left: 15,
+    backgroundColor: GOLD,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+
+  badgeText: {
+    color: '#080808',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  cardContent: {
+    padding: 18,
+  },
+
+  carName: {
+    color: '#FFFFFF',
+    fontSize: 23,
+    fontWeight: '900',
+  },
+
+  price: {
+    color: GOLD,
+    fontSize: 19,
+    fontWeight: '900',
+    marginTop: 7,
+  },
+
+  infoRow: {
+    flexDirection: 'row',
+    gap: 18,
+    marginTop: 15,
+  },
+
+  info: {
+    color: '#AAAAAA',
+    fontSize: 12,
+  },
+
+  button: {
+    marginTop: 18,
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+
+  buttonText: {
+    color: GOLD,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+
+  empty: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+
+  emptyTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+
+  emptyText: {
+    color: '#888888',
+    marginTop: 8,
+  },
+
+  bottomSpace: {
+    height: 120,
+  },
+});

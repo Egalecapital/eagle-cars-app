@@ -86,8 +86,8 @@ export default function MyRequestsScreen() {
             <Text style={styles.notice}>
               {requests.some((request) => request.status === 'pending') &&
                 'Đơn ở trạng thái Chờ xác nhận chưa phải đặt xe được xác nhận chính thức; Eagle Capital sẽ liên hệ để xác nhận. '}
-              Tổng tiền hiển thị là giá dự kiến, giá chính thức do Eagle Capital
-              xác nhận.
+              Đơn chưa xác nhận hiển thị tổng dự kiến; đơn đã xác nhận hiển thị
+              giá chính thức do Eagle Capital chốt.
             </Text>
           </>
         )}
@@ -145,9 +145,11 @@ function RequestCard({ request, onPress }: RequestCardProps) {
 
       <View style={styles.cardFooter}>
         <View>
-          <Text style={styles.totalLabel}>Tổng dự kiến</Text>
+          <Text style={styles.totalLabel}>
+            {request.finalTotal !== null ? 'Giá chính thức' : 'Tổng dự kiến'}
+          </Text>
           <Text style={styles.totalValue}>
-            {formatVnd(request.estimatedTotal)}
+            {formatVnd(request.finalTotal ?? request.estimatedTotal)}
           </Text>
         </View>
 

@@ -31,7 +31,14 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.brand}>EAGLE CAPITAL CARS</Text>
+          {/* Nhấn giữ logo để vào khu quản trị (quyền kiểm tra ở server). */}
+          <Text
+            style={styles.brand}
+            onLongPress={() => router.push('/admin/login')}
+            suppressHighlighting
+          >
+            EAGLE CAPITAL CARS
+          </Text>
 
           <Text style={styles.slogan}>
             THUÊ XE SANG • NÂNG TẦM TRẢI NGHIỆM

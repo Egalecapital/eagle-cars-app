@@ -32,17 +32,17 @@ const SERVICE_TYPE_FROM_DB: Record<string, ServiceType> = {
   wedding: 'Xe cưới',
 };
 
-const BOOKING_COLUMNS =
+export const BOOKING_COLUMNS =
   'id, booking_code, car_id, car_name, service_type, pickup_at, return_at, ' +
   'pickup_location, return_location, customer_name, customer_phone, ' +
   'customer_note, price_per_day, rental_days, estimated_total, final_total, ' +
   'status, status_reason, created_at, updated_at';
 
-const UUID_PATTERN =
+export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Một dòng public.booking_requests (các cột app cần). */
-type BookingRequestRow = {
+export type BookingRequestRow = {
   id: string;
   booking_code: string;
   car_id: string;
@@ -165,7 +165,7 @@ function fromAuthError(error: unknown): BookingServiceError {
   );
 }
 
-function toBookingRequest(row: BookingRequestRow): BookingRequest {
+export function toBookingRequest(row: BookingRequestRow): BookingRequest {
   return {
     id: row.id,
     bookingCode: row.booking_code,
@@ -198,11 +198,11 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
-/** Có phiên đăng nhập đã lưu hay chưa (không tạo phiên mới khi chỉ đọc). */
-async function hasSession(): Promise<boolean> {
+/** User id của phiên đã lưu (không tạo phiên mới khi chỉ đọc). */
+async function getSessionUserId(): Promise<string | undefined> {
   const { data } = await supabase.auth.getSession();
 
-  return !!data.session;
+  return data.session?.user.id;
 }
 
 /**
@@ -250,17 +250,22 @@ export async function createBookingRequest(
 }
 
 /**
- * Lấy "Đơn của tôi", mới nhất trước. RLS chỉ trả đơn của phiên hiện tại.
+ * Lấy "Đơn của tôi", mới nhất trước.
+ * Lọc theo user_id của phiên: RLS cho admin đọc mọi đơn (0003), nên nếu
+ * thiết bị đang đăng nhập admin thì "Đơn của tôi" vẫn chỉ là đơn của mình.
  * Chưa có phiên (chưa từng gửi đơn) → danh sách rỗng.
  */
 export async function getMyBookingRequests(): Promise<BookingRequest[]> {
-  if (!(await hasSession())) {
+  const userId = await getSessionUserId();
+
+  if (!userId) {
     return [];
   }
 
   const { data, error } = await supabase
     .from('booking_requests')
     .select(BOOKING_COLUMNS)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -276,7 +281,7 @@ export async function getMyBookingRequests(): Promise<BookingRequest[]> {
 export async function getBookingRequestById(
   id: string
 ): Promise<BookingRequest | undefined> {
-  if (!UUID_PATTERN.test(id) || !(await hasSession())) {
+  if (!UUID_PATTERN.test(id) || !(await getSessionUserId())) {
     return undefined;
   }
 

@@ -119,17 +119,49 @@ export default function RequestDetailScreen() {
           </Section>
         )}
 
-        <View style={styles.totalCard}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tổng dự kiến</Text>
-            <Text style={styles.totalValue}>
-              {formatVnd(request.estimatedTotal)}
-            </Text>
-          </View>
+        {!!request.statusReason && (
+          <Section
+            title={
+              request.status === 'rejected'
+                ? 'Lý do từ chối'
+                : request.status === 'cancelled'
+                  ? 'Lý do hủy'
+                  : 'Ghi chú từ Eagle Capital'
+            }
+          >
+            <Text style={styles.noteText}>{request.statusReason}</Text>
+          </Section>
+        )}
 
-          <Text style={styles.totalNote}>
-            Giá dự kiến. Eagle Capital sẽ xác nhận giá chính thức khi liên hệ.
-          </Text>
+        <View style={styles.totalCard}>
+          {request.finalTotal !== null ? (
+            <>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Giá chính thức</Text>
+                <Text style={styles.totalValue}>
+                  {formatVnd(request.finalTotal)}
+                </Text>
+              </View>
+
+              <Text style={styles.totalNote}>
+                Đã được Eagle Capital xác nhận. Tổng dự kiến ban đầu:{' '}
+                {formatVnd(request.estimatedTotal)}.
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Tổng dự kiến</Text>
+                <Text style={styles.totalValue}>
+                  {formatVnd(request.estimatedTotal)}
+                </Text>
+              </View>
+
+              <Text style={styles.totalNote}>
+                Giá dự kiến. Eagle Capital sẽ xác nhận giá chính thức khi liên hệ.
+              </Text>
+            </>
+          )}
         </View>
 
         <Text style={styles.notice}>

@@ -1,3 +1,5 @@
+import { getAllCars } from '@/services/car-service';
+import { formatPricePerDay } from '@/utils/format-price';
 import { useState } from 'react';
 import {
   ScrollView,
@@ -7,56 +9,21 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
 const GOLD = '#D4AF37';
 
-const cars = [
-  {
-    id: 1,
-    name: 'Porsche Panamera',
-    category: 'Xe sang',
-    price: '4.500.000đ/ngày',
-    icon: '🏎️',
-  },
-  {
-    id: 2,
-    name: 'BMW 530i M Sport',
-    category: 'Xe sang',
-    price: '3.000.000đ/ngày',
-    icon: '🚘',
-  },
-  {
-    id: 3,
-    name: 'Mercedes E300 AMG',
-    category: 'Xe sang',
-    price: '2.500.000đ/ngày',
-    icon: '🚙',
-  },
-  {
-    id: 4,
-    name: 'Mercedes GLC200',
-    category: 'SUV',
-    price: '2.300.000đ/ngày',
-    icon: '🚗',
-  },
-  {
-    id: 5,
-    name: 'VinFast Lux A',
-    category: 'Tự lái',
-    price: '1.200.000đ/ngày',
-    icon: '🚘',
-  },
-];
+const cars = getAllCars();
 
 const filters = ['Tất cả', 'Xe sang', 'SUV', 'Tự lái', 'Xe cưới'];
-
 export default function ExploreScreen() {
   const [selectedFilter, setSelectedFilter] = useState('Tất cả');
   const [search, setSearch] = useState('');
 
   const filteredCars = cars.filter((car) => {
-    const matchesFilter =
-      selectedFilter === 'Tất cả' || car.category === selectedFilter;
+const matchesFilter =
+  selectedFilter === 'Tất cả' ||
+  (selectedFilter === 'Tự lái'
+    ? car.serviceTypes.includes('Tự lái')
+    : car.category === selectedFilter);
 
     const matchesSearch = car.name
       .toLowerCase()
@@ -133,7 +100,7 @@ export default function ExploreScreen() {
             <View style={styles.cardContent}>
               <Text style={styles.carName}>{car.name}</Text>
 
-              <Text style={styles.price}>{car.price}</Text>
+              <Text style={styles.price}>{formatPricePerDay(car.pricePerDay)}</Text>
 
               <View style={styles.infoRow}>
                 <Text style={styles.info}>✓ Giao xe tận nơi</Text>

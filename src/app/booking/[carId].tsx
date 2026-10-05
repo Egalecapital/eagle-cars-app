@@ -808,6 +808,18 @@ export default function BookingScreen() {
           Chưa cần thanh toán. Eagle Capital sẽ liên hệ xác nhận xe, thời gian
           thuê và thủ tục trước khi hoàn tất đặt xe.
         </Text>
+
+        <Text style={styles.notice}>
+          Khi gửi yêu cầu, bạn đồng ý với{' '}
+          <Text style={styles.legalLink} onPress={() => router.push('/legal/terms' as Href)}>
+            Điều khoản sử dụng
+          </Text>{' '}
+          và{' '}
+          <Text style={styles.legalLink} onPress={() => router.push('/legal/privacy' as Href)}>
+            Chính sách quyền riêng tư
+          </Text>
+          .
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -903,6 +915,11 @@ function SummaryRow({ label, value }: SummaryRowProps) {
 }
 
 const styles = StyleSheet.create({
+  legalLink: {
+    color: '#D4AF37',
+    fontWeight: '800',
+  },
+
   container: {
     flex: 1,
     backgroundColor: '#080808',

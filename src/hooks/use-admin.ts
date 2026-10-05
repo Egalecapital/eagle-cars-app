@@ -7,15 +7,21 @@ import {
   type AdminCar,
   type AdminNotification,
   type AdminStatusFilter,
+  type BookingAccount,
+  type BookingCustomerNotification,
   type BookingStatusEvent,
   getAdminBookingRequest,
+  getBookingAccount,
   getNotificationSummary,
+  getPushSummary,
   isSearchableQuery,
   listAdminBookingRequests,
   listAdminCars,
+  listBookingCustomerNotifications,
   listBookingStatusEvents,
   listCarSchedule,
   listNotifications,
+  listPushNotifications,
   type NotificationStatus,
   type NotificationSummary,
   searchAdminBookingRequests,
@@ -398,7 +404,13 @@ export function useBookingStatusEvents(bookingId: string | undefined, enabled: b
   return { events: data, loading, error, reload };
 }
 
-const EMPTY_SUMMARY: NotificationSummary = { failed: 0, pending: 0, overduePending: 0, sent: 0 };
+const EMPTY_SUMMARY: NotificationSummary = {
+  failed: 0,
+  pending: 0,
+  overduePending: 0,
+  sent: 0,
+  skipped: 0,
+};
 
 /** Đếm thông báo Telegram theo trạng thái; tự làm mới mỗi 60 giây. */
 export function useNotificationSummary(enabled: boolean) {
@@ -431,6 +443,70 @@ export function useAdminNotifications(
     [],
     enabled,
     AUTO_REFRESH_MS
+  );
+
+  return { notifications: data, loading, error, reload };
+}
+
+/** Đếm push cho khách theo trạng thái; tự làm mới mỗi 60 giây. */
+export function usePushSummary(enabled: boolean) {
+  const { data, error, reload } = useAdminResource(
+    getPushSummary,
+    EMPTY_SUMMARY,
+    enabled,
+    AUTO_REFRESH_MS
+  );
+
+  return { summary: data, error, reload };
+}
+
+/** Push cho khách theo bộ lọc. */
+export function useAdminPushNotifications(filter: NotificationStatus | 'all', enabled: boolean) {
+  const load = useCallback(
+    () => listPushNotifications({ status: filter === 'all' ? undefined : filter }),
+    [filter]
+  );
+  const { data, loading, error, reload } = useAdminResource<AdminNotification[]>(
+    load,
+    [],
+    enabled,
+    AUTO_REFRESH_MS
+  );
+
+  return { notifications: data, loading, error, reload };
+}
+
+/** Loại tài khoản sở hữu đơn (ẩn danh / số điện thoại / đã xoá). */
+export function useBookingAccount(bookingId: string | undefined, enabled: boolean) {
+  const load = useCallback(
+    () => (bookingId ? getBookingAccount(bookingId) : Promise.resolve(undefined)),
+    [bookingId]
+  );
+  const { data, error, reload } = useAdminResource<BookingAccount | undefined>(
+    load,
+    undefined,
+    enabled
+  );
+
+  return { account: data, error, reload };
+}
+
+/** Thông báo đã gửi cho khách của một đơn + trạng thái push. */
+export function useBookingCustomerNotifications(
+  booking: { id: string; bookingCode: string } | undefined,
+  enabled: boolean
+) {
+  const id = booking?.id;
+  const code = booking?.bookingCode;
+  const load = useCallback(
+    () =>
+      id && code ? listBookingCustomerNotifications({ id, bookingCode: code }) : Promise.resolve([]),
+    [id, code]
+  );
+  const { data, loading, error, reload } = useAdminResource<BookingCustomerNotification[]>(
+    load,
+    [],
+    enabled
   );
 
   return { notifications: data, loading, error, reload };

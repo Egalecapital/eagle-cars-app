@@ -17,6 +17,7 @@ import {
   useAdminBookingSearch,
   useAdminGuard,
   useNotificationSummary,
+  usePushSummary,
 } from '@/hooks/use-admin';
 import { signOutAdmin } from '@/services/admin-auth-service';
 import { type AdminStatusFilter, SEARCH_RESULT_LIMIT } from '@/services/admin-booking-service';
@@ -51,6 +52,8 @@ export default function AdminRequestsScreen() {
   const [query, setQuery] = useState('');
   const search = useAdminBookingSearch(query, ready);
   const { summary } = useNotificationSummary(ready);
+  const { summary: pushSummary } = usePushSummary(ready);
+  const failedTotal = summary.failed + pushSummary.failed;
   // Mốc "bây giờ" cho nhãn GẤP; cập nhật khi kéo để làm mới.
   const [now, setNow] = useState(() => Date.now());
 
@@ -113,17 +116,17 @@ export default function AdminRequestsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.calendarButton, summary.failed > 0 && styles.navButtonAlert]}
+            style={[styles.calendarButton, failedTotal > 0 && styles.navButtonAlert]}
             activeOpacity={0.8}
             onPress={() => router.push(ADMIN_NOTIFICATIONS)}
           >
-            <Text style={[styles.calendarButtonText, summary.failed > 0 && styles.navTextAlert]}>
-              {summary.failed > 0 ? `THÔNG BÁO (${summary.failed})` : 'THÔNG BÁO'}
+            <Text style={[styles.calendarButtonText, failedTotal > 0 && styles.navTextAlert]}>
+              {failedTotal > 0 ? `THÔNG BÁO (${failedTotal})` : 'THÔNG BÁO'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {(summary.failed > 0 || summary.overduePending > 0) && (
+        {(failedTotal > 0 || summary.overduePending > 0) && (
           <TouchableOpacity
             style={styles.alertBanner}
             activeOpacity={0.85}
@@ -133,7 +136,9 @@ export default function AdminRequestsScreen() {
               ⚠{' '}
               {summary.failed > 0
                 ? `${summary.failed} thông báo Telegram gửi thất bại`
-                : `${summary.overduePending} thông báo Telegram chờ gửi quá 10 phút`}
+                : pushSummary.failed > 0
+                  ? `${pushSummary.failed} thông báo đẩy cho khách gửi thất bại`
+                  : `${summary.overduePending} thông báo Telegram chờ gửi quá 10 phút`}
               {' — '}
               <Text style={styles.alertLink}>Xem</Text>
             </Text>

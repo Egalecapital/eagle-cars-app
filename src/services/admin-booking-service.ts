@@ -383,90 +383,161 @@ type BookingStatusEventRow = {
   id: number;
   from_status: BookingStatus | null;
   to_status: BookingStatus;
-  changed_by: string | null;
-  actor_role: string;
+  actor: 'customer' | 'admin' | 'system' | 'legacy' | 'database';
+  is_viewer: boolean;
   reason: string | null;
   created_at: string;
 };
 
-function toEventActor(
-  row: BookingStatusEventRow,
-  customerId: string | undefined,
-  viewerId: string | undefined
-): BookingEventActor {
-  // Hết hạn luôn là quy tắc tự động (cron 0012, hoặc khi ai đó mở app — 0006).
-  if (row.to_status === 'expired') return 'system';
-  if (row.actor_role === 'migration_0004') return 'legacy';
-  if (!row.changed_by) return 'database';
-  if (customerId && row.changed_by === customerId) return 'customer';
-  if (viewerId && row.changed_by === viewerId) return 'admin-self';
-
-  // Chỉ chủ đơn hoặc admin đổi được trạng thái qua RPC.
-  return 'admin';
-}
-
 /**
- * Lịch sử trạng thái của một đơn, cũ trước mới sau. Admin đọc nhờ policy
- * booking_status_events_select_admin (0004); khách không đọc được.
+ * Lịch sử trạng thái của một đơn, cũ trước mới sau (RPC 0013
+ * admin_list_booking_status_events). Người thực hiện tính ở server từ
+ * admin_users, nên vẫn đúng khi đơn đã chuyển chủ hoặc tài khoản đã xoá.
  */
 export async function listBookingStatusEvents(bookingId: string): Promise<BookingStatusEvent[]> {
   if (!UUID_PATTERN.test(bookingId)) {
     return [];
   }
 
-  const [eventsResult, bookingResult, sessionResult] = await Promise.all([
-    supabase
-      .from('booking_status_events')
-      .select('id, from_status, to_status, changed_by, actor_role, reason, created_at')
-      .eq('booking_id', bookingId)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true })
-      .limit(100),
-    supabase.from('booking_requests').select('user_id').eq('id', bookingId).maybeSingle(),
-    supabase.auth.getSession(),
-  ]);
+  const { data, error } = await supabase.rpc('admin_list_booking_status_events', {
+    p_booking_id: bookingId,
+  });
 
-  if (eventsResult.error) {
-    throw toAdminError(eventsResult.error);
+  if (error) {
+    throw toAdminError(error);
   }
 
-  if (bookingResult.error) {
-    throw toAdminError(bookingResult.error);
-  }
-
-  const customerId = (bookingResult.data as { user_id: string } | null)?.user_id;
-  const viewerId = sessionResult.data.session?.user.id;
-
-  return ((eventsResult.data ?? []) as BookingStatusEventRow[]).map((row) => ({
+  return ((data ?? []) as BookingStatusEventRow[]).map((row) => ({
     id: Number(row.id),
     fromStatus: row.from_status,
     toStatus: row.to_status,
-    actor: toEventActor(row, customerId, viewerId),
+    actor: row.actor === 'admin' && row.is_viewer ? 'admin-self' : row.actor,
     reason: row.reason,
     createdAt: row.created_at,
   }));
 }
 
-export type NotificationStatus = 'pending' | 'sent' | 'failed';
+export type BookingAccountKind = 'anonymous' | 'phone' | 'email' | 'deleted';
+
+export type BookingAccount = {
+  kind: BookingAccountKind;
+  /** Số đã xác thực OTP (dạng 84…), chỉ khi kind = phone. */
+  verifiedPhone: string | null;
+  /** Đơn đã được chuyển từ phiên ẩn danh sang tài khoản. */
+  claimed: boolean;
+};
+
+/** Loại tài khoản sở hữu đơn (RPC 0013 admin_booking_account). */
+export async function getBookingAccount(bookingId: string): Promise<BookingAccount | undefined> {
+  if (!UUID_PATTERN.test(bookingId)) return undefined;
+
+  const { data, error } = await supabase.rpc('admin_booking_account', { p_booking_id: bookingId });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { account_kind: BookingAccountKind; verified_phone: string | null; claimed: boolean }
+    | undefined;
+
+  return row
+    ? { kind: row.account_kind, verifiedPhone: row.verified_phone, claimed: row.claimed }
+    : undefined;
+}
+
+export type BookingCustomerNotification = {
+  id: number;
+  kind: string;
+  title: string;
+  createdAt: string;
+  readAt: string | null;
+  push?: AdminNotification;
+};
+
+type BookingCustomerNotificationRow = {
+  id: number;
+  kind: string;
+  title: string;
+  created_at: string;
+  read_at: string | null;
+  push_id: number | null;
+  push_status: NotificationStatus | null;
+  push_attempts: number | null;
+  push_max_attempts: number | null;
+  push_last_error: string | null;
+  push_sent_at: string | null;
+};
+
+/** Thông báo đã gửi cho khách của một đơn + trạng thái push (RPC 0013). */
+export async function listBookingCustomerNotifications(
+  booking: { id: string; bookingCode: string }
+): Promise<BookingCustomerNotification[]> {
+  const { data, error } = await supabase.rpc('admin_list_customer_notifications', {
+    p_booking_id: booking.id,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return ((data ?? []) as BookingCustomerNotificationRow[]).map((row) => ({
+    id: Number(row.id),
+    kind: row.kind,
+    title: row.title,
+    createdAt: row.created_at,
+    readAt: row.read_at,
+    push:
+      row.push_id && row.push_status
+        ? {
+            id: Number(row.push_id),
+            channel: 'push',
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            subtitle: row.title,
+            status: row.push_status,
+            attempts: row.push_attempts ?? 0,
+            maxAttempts: row.push_max_attempts ?? 0,
+            lastAttemptAt: null,
+            nextAttemptAt: null,
+            lastStatusCode: null,
+            lastError: row.push_last_error,
+            sentAt: row.push_sent_at,
+            createdAt: row.created_at,
+          }
+        : undefined,
+  }));
+}
+
+export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'skipped';
+
+export type NotificationChannel = 'telegram' | 'push';
 
 export type NotificationSummary = {
   failed: number;
   pending: number;
   overduePending: number;
   sent: number;
+  /** Chỉ push: không có thiết bị / thiết bị đã gỡ app. */
+  skipped: number;
 };
 
-/** Một dòng notification_outbox (0010) — không có token / chat id / nội dung tin. */
+/**
+ * Một dòng outbox: Telegram (notification_outbox, 0010) hoặc push cho khách
+ * (push_outbox, 0013). Không có token / chat id / nội dung tin Telegram.
+ */
 export type AdminNotification = {
   id: number;
-  bookingId: string;
-  bookingCode: string;
-  carName: string;
+  channel: NotificationChannel;
+  bookingId: string | null;
+  bookingCode: string | null;
+  /** Telegram: tên xe; push: tiêu đề thông báo gửi khách. */
+  subtitle: string;
   status: NotificationStatus;
   attempts: number;
   maxAttempts: number;
   lastAttemptAt: string | null;
-  nextAttemptAt: string;
+  nextAttemptAt: string | null;
   lastStatusCode: number | null;
   lastError: string | null;
   sentAt: string | null;
@@ -491,9 +562,10 @@ type AdminNotificationRow = {
 
 const toAdminNotification = (row: AdminNotificationRow): AdminNotification => ({
   id: Number(row.id),
+  channel: 'telegram',
   bookingId: row.booking_id,
   bookingCode: row.booking_code,
-  carName: row.car_name,
+  subtitle: row.car_name,
   status: row.status,
   attempts: row.attempts,
   maxAttempts: row.max_attempts,
@@ -527,6 +599,7 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
     pending: row?.pending_count ?? 0,
     overduePending: row?.overdue_pending_count ?? 0,
     sent: row?.sent_count ?? 0,
+    skipped: 0,
   };
 }
 
@@ -556,12 +629,92 @@ export async function listNotifications(options: {
  * Gửi lại thông báo đã thất bại (RPC 0012): đưa về hàng đợi, pg_cron gửi
  * trong vòng khoảng 1 phút. Có thể trùng tin nếu Telegram thật ra đã nhận.
  */
-export async function retryNotification(id: number): Promise<void> {
-  const { error } = await supabase.rpc('admin_retry_notification', { p_outbox_id: id });
+export async function retryNotification(
+  notification: Pick<AdminNotification, 'id' | 'channel'>
+): Promise<void> {
+  const { error } = await supabase.rpc(
+    notification.channel === 'push' ? 'admin_retry_push' : 'admin_retry_notification',
+    { p_outbox_id: notification.id }
+  );
 
   if (error) {
     throw toAdminError(error);
   }
+}
+
+type PushOutboxRow = {
+  id: number;
+  booking_id: string | null;
+  booking_code: string | null;
+  title: string;
+  status: NotificationStatus;
+  attempts: number;
+  max_attempts: number;
+  last_attempt_at: string | null;
+  next_attempt_at: string;
+  last_status_code: number | null;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+};
+
+/** Đếm push cho khách theo trạng thái (RPC 0013). */
+export async function getPushSummary(): Promise<NotificationSummary> {
+  const { data, error } = await supabase.rpc('admin_push_outbox_summary');
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | {
+        failed_count: number;
+        pending_count: number;
+        overdue_pending_count: number;
+        sent_count: number;
+        skipped_count: number;
+      }
+    | undefined;
+
+  return {
+    failed: row?.failed_count ?? 0,
+    pending: row?.pending_count ?? 0,
+    overduePending: row?.overdue_pending_count ?? 0,
+    sent: row?.sent_count ?? 0,
+    skipped: row?.skipped_count ?? 0,
+  };
+}
+
+/** Push cho khách: thất bại trước, rồi đang chờ, đã gửi, bỏ qua (RPC 0013). */
+export async function listPushNotifications(options: {
+  status?: NotificationStatus;
+  limit?: number;
+}): Promise<AdminNotification[]> {
+  const { data, error } = await supabase.rpc('admin_list_push_outbox', {
+    p_status: options.status ?? null,
+    p_limit: options.limit ?? 100,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return ((data ?? []) as PushOutboxRow[]).map((row) => ({
+    id: Number(row.id),
+    channel: 'push',
+    bookingId: row.booking_id,
+    bookingCode: row.booking_code,
+    subtitle: row.title,
+    status: row.status,
+    attempts: row.attempts,
+    maxAttempts: row.max_attempts,
+    lastAttemptAt: row.last_attempt_at,
+    nextAttemptAt: row.next_attempt_at,
+    lastStatusCode: row.last_status_code,
+    lastError: row.last_error,
+    sentAt: row.sent_at,
+    createdAt: row.created_at,
+  }));
 }
 
 /** Mã lỗi cố định trong outbox (0010/0012) → mô tả cho admin. */
@@ -576,6 +729,14 @@ export function describeNotificationError(code: string | null): string | undefin
   if (code === 'TELEGRAM_NOT_OK') return 'Telegram từ chối tin nhắn.';
   if (code === 'RATE_LIMITED') return 'Telegram tạm giới hạn tần suất gửi.';
   if (code === 'MAX_ATTEMPTS') return 'Đã hết số lần thử tự động.';
+  if (code === 'NO_DEVICE') return 'Khách chưa bật thông báo đẩy trên thiết bị nào (vẫn có thông báo trong app).';
+  if (code === 'DEVICE_NOT_REGISTERED') return 'Thiết bị của khách đã gỡ app hoặc tắt thông báo.';
+  if (code === 'PARTIAL') return 'Đã gửi tới một phần thiết bị của khách.';
+  if (code === 'BAD_RESPONSE') return 'Phản hồi từ Expo không đọc được.';
+  if (code === 'TICKET_InvalidCredentials') {
+    return 'Chưa cấu hình APNs (iOS) / FCM (Android) cho app trên Expo — xem README.';
+  }
+  if (code.startsWith('TICKET_')) return `Expo từ chối thông báo (${code.slice(7)}).`;
   if (code.startsWith('SEND_ERROR_')) return `Lỗi khi gửi (mã ${code.slice(11)}).`;
   if (code.startsWith('PROCESS_ERROR_')) return `Lỗi xử lý hàng đợi (mã ${code.slice(14)}).`;
 

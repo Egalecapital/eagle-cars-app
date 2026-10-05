@@ -1,10 +1,11 @@
 /**
  * QUẦY PHIÊN ĐĂNG NHẬP
  *
- * App chưa có màn đăng nhập. Mỗi thiết bị dùng một user ẩn danh của
- * Supabase (signInAnonymously). User này vẫn có role Postgres
- * `authenticated` và auth.uid() riêng, nên RLS "Đơn của tôi" hoạt động.
- * Sau này có thể nâng cấp lên tài khoản thật mà giữ nguyên user id.
+ * Khách chưa đăng nhập dùng một user ẩn danh của Supabase
+ * (signInAnonymously) — vẫn có role Postgres `authenticated` và auth.uid()
+ * riêng, nên RLS "Đơn của tôi" hoạt động. Khách đăng nhập bằng số điện thoại
+ * (account-service.ts) thì dùng phiên tài khoản đó; các đơn của phiên ẩn danh
+ * cũ được chuyển sang bằng mã một lần (RPC 0013).
  */
 
 import type { Session, User } from '@supabase/supabase-js';

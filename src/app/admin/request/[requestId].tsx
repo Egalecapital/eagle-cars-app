@@ -20,10 +20,13 @@ import {
   useAdminBookingRequest,
   useAdminGuard,
   useAdminNotifications,
+  useBookingAccount,
+  useBookingCustomerNotifications,
   useBookingStatusEvents,
 } from '@/hooks/use-admin';
 import {
   AdminBookingError,
+  type BookingAccount,
   cancelAdminBookingRequest,
   completeAdminBookingRequest,
   confirmAdminBookingRequest,
@@ -32,6 +35,7 @@ import {
 import { formatDateTime } from '@/utils/format-date';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
 import { goBackOr } from '@/utils/navigation';
+import { formatVnPhone } from '@/utils/phone';
 
 const GOLD = '#D4AF37';
 
@@ -50,6 +54,11 @@ export default function AdminRequestDetailScreen() {
   const { request, loading, error, reload } = useAdminBookingRequest(requestId, ready);
   const history = useBookingStatusEvents(requestId, ready);
   const telegram = useAdminNotifications('all', ready && !!request, request?.id);
+  const owner = useBookingAccount(requestId, ready);
+  const customerNotifications = useBookingCustomerNotifications(
+    request ? { id: request.id, bookingCode: request.bookingCode } : undefined,
+    ready && !!request
+  );
 
   const [finalTotalText, setFinalTotalText] = useState('');
   const [note, setNote] = useState('');
@@ -146,6 +155,7 @@ export default function AdminRequestDetailScreen() {
 
       reload();
       history.reload();
+      customerNotifications.reload();
     } catch (actionErr) {
       setActionError(
         actionErr instanceof AdminBookingError
@@ -187,6 +197,7 @@ export default function AdminRequestDetailScreen() {
           <Row label="Họ và tên" value={request.customer.fullName} />
           <Row label="Số điện thoại" value={request.customer.phone} />
           <Row label="Ghi chú" value={request.note || '—'} />
+          <Row label="Tài khoản" value={describeAccount(owner.account, owner.error)} />
 
           {phoneDigits.length >= 9 && (
             <TouchableOpacity style={styles.callButton} onPress={callCustomer}>
@@ -356,6 +367,35 @@ export default function AdminRequestDetailScreen() {
           />
         </Section>
 
+        <Section title="Thông báo cho khách">
+          {!!customerNotifications.error && (
+            <Text style={styles.mutedText}>{customerNotifications.error}</Text>
+          )}
+          {!customerNotifications.error &&
+            !customerNotifications.loading &&
+            customerNotifications.notifications.length === 0 && (
+              <Text style={styles.mutedText}>
+                Chưa có thông báo nào gửi khách cho đơn này (thông báo được tạo khi đơn được xác
+                nhận / từ chối / huỷ / hết hạn / hoàn tất).
+              </Text>
+            )}
+          {customerNotifications.notifications.map((item) => (
+            <View key={item.id} style={styles.customerNotification}>
+              <Text style={styles.customerNotificationTitle}>{item.title}</Text>
+              <Text style={styles.mutedText}>
+                {formatDateTime(item.createdAt)} ·{' '}
+                {item.readAt ? `Khách đã xem ${formatDateTime(item.readAt)}` : 'Khách chưa xem trong app'}
+              </Text>
+              {item.push && (
+                <AdminNotificationCard
+                  notification={item.push}
+                  onRetried={customerNotifications.reload}
+                />
+              )}
+            </View>
+          ))}
+        </Section>
+
         <Section title="Thông báo Telegram">
           {!!telegram.error && <Text style={styles.mutedText}>{telegram.error}</Text>}
           {!telegram.error && !telegram.loading && telegram.notifications.length === 0 && (
@@ -372,6 +412,24 @@ export default function AdminRequestDetailScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+}
+
+function describeAccount(account: BookingAccount | undefined, error: string | undefined): string {
+  if (error) return 'Không tải được';
+  if (!account) return '…';
+
+  const claimed = account.claimed ? ' (đã chuyển từ phiên ẩn danh)' : '';
+
+  switch (account.kind) {
+    case 'phone':
+      return `Tài khoản SĐT ${formatVnPhone(account.verifiedPhone)} (đã xác thực OTP)${claimed}`;
+    case 'email':
+      return `Tài khoản email${claimed}`;
+    case 'deleted':
+      return 'Khách đã xoá tài khoản';
+    default:
+      return 'Khách ẩn danh (chưa đăng nhập)';
+  }
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -442,6 +500,12 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 80 },
   preview: { color: '#5CC98A', fontSize: 13, marginTop: 6 },
   mutedText: { color: '#888888', fontSize: 14, lineHeight: 20 },
+  customerNotification: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#232323',
+    paddingVertical: 10,
+  },
+  customerNotificationTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', marginBottom: 4 },
   callButton: {
     borderWidth: 1.5,
     borderColor: GOLD,

@@ -44,3 +44,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Khoá service account (FCM / Google Play) — tải lên EAS, KHÔNG commit
+*-firebase-adminsdk-*.json
+*service-account*.json

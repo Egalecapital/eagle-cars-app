@@ -20,8 +20,11 @@ import {
   MaxContentWidth,
   Spacing,
 } from '@/constants/theme';
+import { useUnreadNotificationCount } from '@/hooks/use-customer-notifications';
 
 export default function AppTabs() {
+  const unread = useUnreadNotificationCount();
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
@@ -50,6 +53,22 @@ export default function AppTabs() {
             asChild
           >
             <TabButton>Đơn của tôi</TabButton>
+          </TabTrigger>
+
+          <TabTrigger
+            name="notifications"
+            href="/notifications"
+            asChild
+          >
+            <TabButton>{unread > 0 ? `Thông báo (${unread > 99 ? '99+' : unread})` : 'Thông báo'}</TabButton>
+          </TabTrigger>
+
+          <TabTrigger
+            name="account"
+            href="/account"
+            asChild
+          >
+            <TabButton>Tài khoản</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>

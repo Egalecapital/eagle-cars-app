@@ -11,8 +11,14 @@ import {
 } from 'react-native';
 
 import { AdminNotificationCard } from '@/components/admin-notification-card';
-import { useAdminGuard, useAdminNotifications, useNotificationSummary } from '@/hooks/use-admin';
-import type { NotificationStatus } from '@/services/admin-booking-service';
+import {
+  useAdminGuard,
+  useAdminNotifications,
+  useAdminPushNotifications,
+  useNotificationSummary,
+  usePushSummary,
+} from '@/hooks/use-admin';
+import type { NotificationChannel, NotificationStatus } from '@/services/admin-booking-service';
 import { goBackOr } from '@/utils/navigation';
 
 const GOLD = '#D4AF37';
@@ -22,23 +28,39 @@ const ADMIN_HOME = '/admin' as Href;
 
 type Filter = NotificationStatus | 'all';
 
-const FILTERS: { value: Filter; label: string }[] = [
+const FILTERS: { value: Filter; label: string; push?: boolean }[] = [
   { value: 'failed', label: 'Thất bại' },
   { value: 'pending', label: 'Đang chờ' },
   { value: 'sent', label: 'Đã gửi' },
+  { value: 'skipped', label: 'Không gửi', push: true },
   { value: 'all', label: 'Tất cả' },
 ];
 
 export default function AdminNotificationsScreen() {
   const router = useRouter();
   const ready = useAdminGuard();
+  const [channel, setChannel] = useState<NotificationChannel>('telegram');
   const [filter, setFilter] = useState<Filter>('all');
-  const { summary, reload: reloadSummary } = useNotificationSummary(ready);
-  const { notifications, loading, error, reload } = useAdminNotifications(filter, ready);
+  const isPush = channel === 'push';
+  const telegramSummary = useNotificationSummary(ready);
+  const pushSummary = usePushSummary(ready);
+  // Chỉ kênh đang xem tải danh sách.
+  const telegram = useAdminNotifications(
+    filter === 'skipped' ? 'all' : filter,
+    ready && !isPush
+  );
+  const push = useAdminPushNotifications(filter, ready && isPush);
+  const { summary, reload: reloadSummary } = isPush ? pushSummary : telegramSummary;
+  const { notifications, loading, error, reload } = isPush ? push : telegram;
 
   const reloadAll = () => {
     reload();
     reloadSummary();
+  };
+
+  const switchChannel = (next: NotificationChannel) => {
+    setChannel(next);
+    setFilter('all');
   };
 
   if (!ready) {
@@ -60,10 +82,32 @@ export default function AdminNotificationsScreen() {
         </TouchableOpacity>
 
         <Text style={styles.eyebrow}>EAGLE CAPITAL CARS</Text>
-        <Text style={styles.title}>THÔNG BÁO TELEGRAM</Text>
+        <Text style={styles.title}>THÔNG BÁO</Text>
+
+        <View style={styles.channelRow}>
+          {(['telegram', 'push'] as const).map((value) => {
+            const active = value === channel;
+            const failed = value === 'push' ? pushSummary.summary.failed : telegramSummary.summary.failed;
+
+            return (
+              <TouchableOpacity
+                key={value}
+                style={[styles.channel, active && styles.channelActive]}
+                onPress={() => switchChannel(value)}
+              >
+                <Text style={[styles.channelText, active && styles.channelTextActive]}>
+                  {value === 'push' ? 'PUSH KHÁCH' : 'TELEGRAM'}
+                  {failed > 0 ? ` (${failed} lỗi)` : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <Text style={styles.subtitle}>
-          Mỗi đơn mới gửi 1 tin vào nhóm Telegram. Hệ thống tự thử lại khi lỗi; dòng THẤT BẠI là
-          đã hết lượt thử tự động.
+          {isPush
+            ? 'Thông báo đẩy tới điện thoại khách khi đơn được xác nhận / từ chối / huỷ / hết hạn / hoàn tất. Khách luôn có bản trong mục Thông báo của app. KHÔNG GỬI = khách chưa bật thông báo hoặc đã gỡ app.'
+            : 'Mỗi đơn mới gửi 1 tin vào nhóm Telegram. Hệ thống tự thử lại khi lỗi; dòng THẤT BẠI là đã hết lượt thử tự động.'}
         </Text>
 
         <View style={styles.summaryRow}>
@@ -78,7 +122,7 @@ export default function AdminNotificationsScreen() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-          {FILTERS.map((item) => {
+          {FILTERS.filter((item) => isPush || !item.push).map((item) => {
             const active = item.value === filter;
 
             return (
@@ -118,11 +162,14 @@ export default function AdminNotificationsScreen() {
               key={notification.id}
               notification={notification}
               onRetried={reloadAll}
-              onOpenBooking={() =>
-                router.push({
-                  pathname: '/admin/request/[requestId]',
-                  params: { requestId: notification.bookingId },
-                })
+              onOpenBooking={
+                notification.bookingId
+                  ? () =>
+                      router.push({
+                        pathname: '/admin/request/[requestId]',
+                        params: { requestId: notification.bookingId as string },
+                      })
+                  : undefined
               }
             />
           ))}
@@ -165,6 +212,18 @@ const styles = StyleSheet.create({
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 6 },
   subtitle: { color: '#888888', fontSize: 13, lineHeight: 19, marginTop: 6 },
   summaryRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  channelRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  channel: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#444444',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  channelActive: { borderColor: GOLD, backgroundColor: 'rgba(212, 175, 55, 0.12)' },
+  channelText: { color: '#AAAAAA', fontWeight: '900', fontSize: 13 },
+  channelTextActive: { color: GOLD },
   summaryBox: {
     flex: 1,
     backgroundColor: '#151515',

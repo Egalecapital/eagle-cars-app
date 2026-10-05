@@ -16,6 +16,7 @@ const STATUS_UI: Record<NotificationStatus, { label: string; color: string; back
   failed: { label: 'THẤT BẠI', color: '#FF8A80', background: 'rgba(255, 138, 128, 0.12)' },
   pending: { label: 'ĐANG CHỜ GỬI', color: GOLD, background: 'rgba(212, 175, 55, 0.12)' },
   sent: { label: 'ĐÃ GỬI', color: '#5CC98A', background: 'rgba(92, 201, 138, 0.12)' },
+  skipped: { label: 'KHÔNG GỬI', color: '#9A9A9A', background: 'rgba(154, 154, 154, 0.12)' },
 };
 
 type AdminNotificationCardProps = {
@@ -26,7 +27,7 @@ type AdminNotificationCardProps = {
   onOpenBooking?: () => void;
 };
 
-/** Một thông báo Telegram (outbox). Dòng thất bại có nút gửi lại 2 bước. */
+/** Một thông báo Telegram hoặc push khách (outbox). Dòng thất bại có nút gửi lại 2 bước. */
 export function AdminNotificationCard({
   notification,
   onRetried,
@@ -49,7 +50,7 @@ export function AdminNotificationCard({
     setError('');
 
     try {
-      await retryNotification(notification.id);
+      await retryNotification(notification);
       setConfirming(false);
       setMessage('Đã đưa vào hàng đợi. Hệ thống sẽ gửi lại trong khoảng 1 phút.');
       onRetried();
@@ -68,19 +69,21 @@ export function AdminNotificationCard({
   return (
     <View style={[styles.card, notification.status === 'failed' && styles.cardFailed]}>
       <View style={styles.top}>
-        {onOpenBooking ? (
+        {onOpenBooking && notification.bookingCode ? (
           <TouchableOpacity onPress={onOpenBooking} hitSlop={8}>
             <Text style={[styles.code, styles.link]}>{notification.bookingCode} ›</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.code}>Telegram</Text>
+          <Text style={styles.code}>{notification.channel === 'push' ? 'Push khách' : 'Telegram'}</Text>
         )}
         <Text style={[styles.badge, { color: ui.color, backgroundColor: ui.background }]}>
           {ui.label}
         </Text>
       </View>
 
-      {onOpenBooking && <Text style={styles.car}>{notification.carName}</Text>}
+      {(onOpenBooking || notification.channel === 'push') && (
+        <Text style={styles.car}>{notification.subtitle}</Text>
+      )}
 
       <Text style={styles.meta}>
         Lần thử: {notification.attempts}/{notification.maxAttempts}
@@ -89,7 +92,7 @@ export function AdminNotificationCard({
       {notification.status === 'sent' && notification.sentAt && (
         <Text style={styles.meta}>Đã gửi lúc {formatDateTime(notification.sentAt)}</Text>
       )}
-      {notification.status === 'pending' && (
+      {notification.status === 'pending' && notification.nextAttemptAt && (
         <Text style={styles.meta}>Lượt gửi kế tiếp: {formatDateTime(notification.nextAttemptAt)}</Text>
       )}
       {!!errorText && notification.status !== 'sent' && (
@@ -102,7 +105,9 @@ export function AdminNotificationCard({
         (confirming ? (
           <View style={styles.confirmBox}>
             <Text style={styles.confirmText}>
-              Gửi lại thông báo này? Nếu Telegram thật ra đã nhận, nhóm có thể thấy tin trùng.
+              {notification.channel === 'push'
+                ? 'Gửi lại thông báo đẩy cho khách? Nếu khách thật ra đã nhận, họ có thể thấy tin trùng.'
+                : 'Gửi lại thông báo này? Nếu Telegram thật ra đã nhận, nhóm có thể thấy tin trùng.'}
             </Text>
             <View style={styles.confirmRow}>
               <TouchableOpacity

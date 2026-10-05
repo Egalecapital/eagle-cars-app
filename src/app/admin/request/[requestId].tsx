@@ -22,12 +22,14 @@ import {
   useAdminGuard,
   useAdminNotifications,
   useBookingAccount,
+  useBookingChanges,
   useBookingCustomerNotifications,
   useBookingStatusEvents,
 } from '@/hooks/use-admin';
 import {
   AdminBookingError,
   type BookingAccount,
+  type BookingChange,
   cancelAdminBookingRequest,
   completeAdminBookingRequest,
   confirmAdminBookingRequest,
@@ -56,6 +58,7 @@ export default function AdminRequestDetailScreen() {
   const history = useBookingStatusEvents(requestId, ready);
   const telegram = useAdminNotifications('all', ready && !!request, request?.id);
   const owner = useBookingAccount(requestId, ready);
+  const edits = useBookingChanges(requestId, ready);
   // Đơn khác của cùng xe chồng thời gian (đơn chờ / đã xác nhận).
   const sameCar = useAdminCarSchedule(
     request?.carId,
@@ -192,6 +195,17 @@ export default function AdminRequestDetailScreen() {
           <BookingStatusBadge status={request.status} />
         </View>
         <Text style={styles.carName}>{request.carName}</Text>
+
+        {(isPending || isConfirmed) && (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              router.push({ pathname: '/admin/edit/[requestId]', params: { requestId: request.id } })
+            }
+          >
+            <Text style={styles.editButtonText}>SỬA ĐƠN (xe, giờ, địa điểm, khách, giá)</Text>
+          </TouchableOpacity>
+        )}
 
         {(isPending || isConfirmed) && overlaps.length > 0 && (
           <View
@@ -407,6 +421,22 @@ export default function AdminRequestDetailScreen() {
             error={history.error}
             onRetry={history.reload}
           />
+
+          {edits.changes.length > 0 && (
+            <View style={styles.editLog}>
+              <Text style={styles.editLogTitle}>Chỉnh sửa</Text>
+              {edits.changes.map((change) => (
+                <View key={change.id} style={styles.editLogItem}>
+                  <Text style={styles.mutedText}>{formatDateTime(change.createdAt)} · Admin</Text>
+                  {describeChange(change).map((line) => (
+                    <Text key={line} style={styles.editLogLine}>
+                      • {line}
+                    </Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
         </Section>
 
         <Section title="Thông báo cho khách">
@@ -454,6 +484,41 @@ export default function AdminRequestDetailScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  self_drive: 'Tự lái',
+  with_driver: 'Có lái',
+  wedding: 'Xe cưới',
+};
+
+/** Nhật ký sửa đơn (0015) → các dòng dễ đọc. Thông tin cá nhân chỉ ghi "đã đổi". */
+function describeChange(change: BookingChange): string[] {
+  const c = change.changes as Record<string, [unknown, unknown] | boolean>;
+  const pair = (key: string) => (Array.isArray(c[key]) ? (c[key] as [unknown, unknown]) : undefined);
+  const lines: string[] = [];
+  const car = pair('car');
+  const pickup = pair('pickup_at');
+  const ret = pair('return_at');
+  const service = pair('service_type');
+  const total = pair('final_total');
+  const money = (value: unknown) => (typeof value === 'number' ? formatVnd(value) : '—');
+
+  if (car) lines.push(`Xe: ${car[0]} → ${car[1]}`);
+  if (pickup && ret) {
+    lines.push(
+      `Thời gian: ${formatDateTime(String(pickup[0]))} → ${formatDateTime(String(ret[0]))} thành ${formatDateTime(String(pickup[1]))} → ${formatDateTime(String(ret[1]))}`
+    );
+  }
+  if (service) {
+    lines.push(`Hình thức: ${SERVICE_LABELS[String(service[0])] ?? service[0]} → ${SERVICE_LABELS[String(service[1])] ?? service[1]}`);
+  }
+  if (total) lines.push(`Giá chốt: ${money(total[0])} → ${money(total[1])}`);
+  if (c.location === true) lines.push('Địa điểm nhận/trả đã đổi');
+  if (c.customer === true) lines.push('Họ tên / số điện thoại khách đã đổi');
+  if (c.note === true) lines.push('Ghi chú đã đổi');
+
+  return lines.length > 0 ? lines : ['Đã sửa đơn'];
 }
 
 function describeAccount(account: BookingAccount | undefined, error: string | undefined): string {
@@ -542,6 +607,19 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 80 },
   preview: { color: '#5CC98A', fontSize: 13, marginTop: 6 },
   mutedText: { color: '#888888', fontSize: 14, lineHeight: 20 },
+  editButton: {
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  editButtonText: { color: GOLD, fontWeight: '900', fontSize: 14 },
+  editLog: { borderTopWidth: 1, borderTopColor: '#262626', marginTop: 14, paddingTop: 10 },
+  editLogTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', marginBottom: 4 },
+  editLogItem: { paddingVertical: 6 },
+  editLogLine: { color: '#CCCCCC', fontSize: 13, lineHeight: 19, marginTop: 2 },
   overlapBox: {
     borderWidth: 1,
     borderColor: GOLD,

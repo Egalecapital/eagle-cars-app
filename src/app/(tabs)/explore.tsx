@@ -108,7 +108,7 @@ export default function ExploreScreen() {
           <Text style={styles.heading}>Danh sách xe</Text>
 
           <Text style={styles.count}>
-            {filteredCars.length} xe
+            {catalog.status === 'loading' ? '' : `${filteredCars.length} xe`}
           </Text>
         </View>
 

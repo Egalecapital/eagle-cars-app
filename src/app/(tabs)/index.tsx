@@ -78,7 +78,7 @@ export default function HomeScreen() {
           </Text>
 
           <Text style={styles.sectionCount}>
-            {cars.length} xe
+            {catalog.status === 'loading' ? '' : `${cars.length} xe`}
           </Text>
         </View>
 

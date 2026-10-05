@@ -9,6 +9,8 @@ App đặt thuê xe sang của Eagle Capital (Expo / React Native, Expo Router, 
 - **Admin** (`/admin`, hoặc nhấn giữ logo trên Trang chủ): đăng nhập email, danh sách đơn theo trạng thái
   (nhãn GẤP cho đơn chờ sắp tới giờ nhận, số đơn chờ), tìm đơn theo mã EC / số điện thoại / tên khách,
   **tạo đơn cho khách gọi điện / đến trực tiếp** (xác nhận ngay để giữ lịch xe), cảnh báo đơn trùng lịch cùng xe,
+  **sửa đơn** đang chờ / đã xác nhận (xe, giờ, hình thức, địa điểm, khách, giá chốt — có nhật ký sửa, báo khách),
+  bảng **HÔM NAY** (nhận xe, trả xe, đang thuê, quá giờ trả cần hoàn tất),
   xác nhận / từ chối / hoàn tất / hủy đơn, gọi khách, lịch sử thao tác của từng đơn, Lịch xe,
   Xe & giá, theo dõi thông báo Telegram và push khách (thất bại / đang chờ / đã gửi) và gửi lại khi thất bại,
   loại tài khoản của đơn (ẩn danh / số điện thoại / đã xoá), thông báo đã gửi cho khách theo đơn.
@@ -51,6 +53,7 @@ Migration trong `supabase/migrations/`, chạy theo thứ tự (đã áp dụng 
 | `0012_admin_search_outbox_expire.sql` | Admin tìm đơn (`admin_search_booking_requests`), theo dõi / gửi lại thông báo Telegram (`admin_*notification*`), `pg_cron` mỗi 5 phút tự chuyển đơn chờ quá giờ nhận sang hết hạn (job `eagle-expire-stale-bookings`) |
 | `0013_customer_accounts_notifications.sql` | Tài khoản khách: chuyển đơn ẩn danh → tài khoản (mã một lần), thông báo trong app (trigger), push outbox + `pg_cron` mỗi phút (job `eagle-push-outbox`), xoá tài khoản (ẩn danh hoá đơn), RPC admin; FK `booking_requests.user_id` → `ON DELETE SET NULL` |
 | `0014_admin_offline_booking_guard.sql` | Cột `booking_requests.source` (app / admin), RPC `admin_create_booking` (admin nhập đơn ngoài app, mặc định xác nhận ngay), trigger chặn đơn trùng (`DUPLICATE_REQUEST`) và > 10 đơn / giờ / tài khoản (`TOO_MANY_REQUESTS`) |
+| `0015_admin_edit_booking.sql` | RPC `admin_update_booking` (sửa đơn chờ / đã xác nhận, chống ghi đè đồng thời, exclusion constraint chặn trùng), bảng `booking_change_events` (nhật ký sửa, không lưu giá trị thông tin cá nhân), thông báo khách `booking_updated`; `admin_create_booking` chặn tạo đơn CHỜ với giờ nhận đã qua |
 
 Danh mục xe: Supabase (`public.cars`) quyết định xe nào đang cho thuê, tên và giá; `src/data/cars.ts`
 chỉ bổ sung ảnh / mô tả. Xe có trong database nhưng chưa có dữ liệu trong `cars.ts` sẽ chưa hiển thị.

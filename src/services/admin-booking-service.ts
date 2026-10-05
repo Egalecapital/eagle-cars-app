@@ -22,7 +22,11 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   NOT_ADMIN: 'Tài khoản không có quyền quản trị. Vui lòng đăng nhập lại.',
   BOOKING_NOT_FOUND: 'Không tìm thấy đơn này.',
   NOT_PENDING: 'Đơn không còn ở trạng thái Chờ xác nhận. Vui lòng tải lại.',
-  PICKUP_IN_PAST: 'Đơn đã quá giờ nhận xe, không thể xác nhận. Hãy từ chối đơn.',
+  PICKUP_IN_PAST:
+    'Giờ nhận xe đã qua: đơn chờ xác nhận cần giờ nhận ở tương lai (đơn chờ đã quá giờ hãy từ chối).',
+  STALE_BOOKING: 'Đơn vừa được thay đổi ở nơi khác. Hãy mở lại đơn rồi sửa lần nữa.',
+  NOT_EDITABLE: 'Chỉ sửa được đơn đang chờ hoặc đã xác nhận.',
+  NO_CHANGES: 'Chưa có thay đổi nào để lưu.',
   CAR_NOT_AVAILABLE: 'Xe đang tạm ngừng nhận đặt, không thể xác nhận.',
   INVALID_FINAL_TOTAL: 'Giá chốt không hợp lệ.',
   NOTE_TOO_LONG: 'Ghi chú quá dài (ghi chú cho khách tối đa 500 ký tự, ghi chú đơn tối đa 1000 ký tự).',
@@ -818,4 +822,90 @@ export async function countPendingBookings(): Promise<number> {
   }
 
   return count ?? 0;
+}
+
+/**
+ * Admin sửa đơn đang chờ / đã xác nhận (RPC 0015). Không đổi trạng thái.
+ * expectedUpdatedAt: đúng chuỗi updated_at đã đọc (so khớp từng micro giây)
+ * → đơn bị đổi ở nơi khác thì STALE_BOOKING.
+ */
+export async function updateAdminBooking(
+  booking: Pick<BookingRequest, 'id' | 'updatedAt'>,
+  input: Omit<AdminBookingInput, 'confirm'>
+): Promise<BookingRequest> {
+  const { data, error } = await supabase.rpc('admin_update_booking', {
+    p_booking_id: booking.id,
+    p_expected_updated_at: booking.updatedAt,
+    p_car_id: input.carId,
+    p_service_type: input.serviceType,
+    p_pickup_at: input.pickupAt,
+    p_return_at: input.returnAt,
+    p_pickup_location: input.pickupLocation.trim(),
+    p_return_location: input.returnLocation.trim() || null,
+    p_customer_name: input.customerName.trim(),
+    p_customer_phone: input.customerPhone.trim(),
+    p_customer_note: input.note.trim() || null,
+    p_final_total: input.finalTotal,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return toBookingRequest(data as BookingRequestRow);
+}
+
+export type BookingChange = {
+  id: number;
+  changedBy: string | null;
+  /** Khoá: car, pickup_at, return_at, service_type, final_total ([cũ, mới]); location, customer, note (true). */
+  changes: Record<string, unknown>;
+  createdAt: string;
+};
+
+/** Nhật ký chỉnh sửa của một đơn (bảng booking_change_events, 0015; chỉ admin đọc). */
+export async function listBookingChanges(bookingId: string): Promise<BookingChange[]> {
+  if (!UUID_PATTERN.test(bookingId)) return [];
+
+  const { data, error } = await supabase
+    .from('booking_change_events')
+    .select('id, changed_by, changes, created_at')
+    .eq('booking_id', bookingId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(100);
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return (
+    (data ?? []) as { id: number; changed_by: string | null; changes: Record<string, unknown>; created_at: string }[]
+  ).map((row) => ({
+    id: Number(row.id),
+    changedBy: row.changed_by,
+    changes: row.changes,
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * Đơn ĐÃ XÁC NHẬN có giờ nhận trước cuối ngày hôm nay (giờ VN): gồm đơn nhận
+ * hôm nay, đang cho thuê, trả hôm nay và quá giờ trả chưa hoàn tất — cho bảng
+ * "Hôm nay" của admin (phân nhóm phía app).
+ */
+export async function listTodayOperations(to: Date): Promise<BookingRequest[]> {
+  const { data, error } = await supabase
+    .from('booking_requests')
+    .select(BOOKING_COLUMNS)
+    .eq('status', 'confirmed')
+    .lt('pickup_at', to.toISOString())
+    .order('pickup_at', { ascending: true })
+    .limit(200);
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return ((data ?? []) as unknown as BookingRequestRow[]).map(toBookingRequest);
 }

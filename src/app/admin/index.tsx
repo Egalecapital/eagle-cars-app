@@ -19,12 +19,15 @@ import {
   useNotificationSummary,
   usePendingCount,
   usePushSummary,
+  type TodayOperations,
+  useTodayOperations,
 } from '@/hooks/use-admin';
 import { signOutAdmin } from '@/services/admin-auth-service';
 import { type AdminStatusFilter, SEARCH_RESULT_LIMIT } from '@/services/admin-booking-service';
 import type { BookingRequest } from '@/types/booking';
 import { formatDateTime } from '@/utils/format-date';
 import { formatVnd } from '@/utils/format-price';
+import { formatVnTime } from '@/utils/vn-time';
 
 const GOLD = '#D4AF37';
 
@@ -57,6 +60,7 @@ export default function AdminRequestsScreen() {
   const { summary: pushSummary } = usePushSummary(ready);
   const failedTotal = summary.failed + pushSummary.failed;
   const { pendingCount, reload: reloadPending } = usePendingCount(ready);
+  const { today, reload: reloadToday } = useTodayOperations(ready);
   // Mốc "bây giờ" cho nhãn GẤP; cập nhật khi kéo để làm mới.
   const [now, setNow] = useState(() => Date.now());
 
@@ -67,6 +71,7 @@ export default function AdminRequestsScreen() {
     setNow(Date.now());
     reload();
     reloadPending();
+    reloadToday();
   };
 
   const handleSignOut = async () => {
@@ -129,6 +134,8 @@ export default function AdminRequestsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <TodayPanel today={today} onOpen={openRequest} />
 
         <TouchableOpacity
           style={styles.newBookingButton}
@@ -273,6 +280,45 @@ export default function AdminRequestsScreen() {
   );
 }
 
+const TODAY_GROUPS: { key: keyof TodayOperations; title: string; danger?: boolean; time: 'pickup' | 'return' }[] = [
+  { key: 'overdue', title: 'Quá giờ trả — cần HOÀN TẤT', danger: true, time: 'return' },
+  { key: 'pickups', title: 'Nhận xe hôm nay', time: 'pickup' },
+  { key: 'returns', title: 'Trả xe hôm nay', time: 'return' },
+  { key: 'ongoing', title: 'Đang cho thuê', time: 'return' },
+];
+
+/** Việc vận hành hôm nay (đơn đã xác nhận). Ẩn khi không có gì. */
+function TodayPanel({ today, onOpen }: { today: TodayOperations; onOpen: (id: string) => void }) {
+  const groups = TODAY_GROUPS.filter((group) => today[group.key].length > 0);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <View style={styles.todayBox}>
+      <Text style={styles.todayTitle}>HÔM NAY</Text>
+      {groups.map((group) => (
+        <View key={group.key} style={styles.todayGroup}>
+          <Text style={[styles.todayGroupTitle, group.danger && styles.todayDanger]}>
+            {group.title} ({today[group.key].length})
+          </Text>
+          {today[group.key].slice(0, 8).map((item) => (
+            <TouchableOpacity key={item.id} onPress={() => onOpen(item.id)}>
+              <Text style={styles.todayItem}>
+                {group.time === 'pickup' ? 'Nhận' : 'Trả'} {formatVnTime(new Date(group.time === 'pickup' ? item.pickupAt : item.returnAt))}
+                {' · '}
+                {item.bookingCode} · {item.carName} · {item.customer.fullName} ›
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {today[group.key].length > 8 && (
+            <Text style={styles.todayMore}>… và {today[group.key].length - 8} đơn khác</Text>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** Nhãn cho đơn chờ xác nhận sắp tới giờ nhận (≤ 24 giờ) hoặc đã quá giờ. */
 function pendingUrgency(request: BookingRequest, now: number): string | undefined {
   if (request.status !== 'pending') return undefined;
@@ -354,6 +400,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   calendarButtonText: { color: GOLD, fontWeight: '900', letterSpacing: 0.5, fontSize: 13 },
+  todayBox: {
+    backgroundColor: '#151515',
+    borderWidth: 1,
+    borderColor: '#303030',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+  },
+  todayTitle: { color: GOLD, fontSize: 13, fontWeight: '900', letterSpacing: 1.5 },
+  todayGroup: { marginTop: 10 },
+  todayGroupTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '900', marginBottom: 4 },
+  todayDanger: { color: '#FF8A80' },
+  todayItem: { color: '#CCCCCC', fontSize: 13, lineHeight: 22 },
+  todayMore: { color: '#888888', fontSize: 12, marginTop: 2 },
   newBookingButton: {
     backgroundColor: GOLD,
     borderRadius: 14,

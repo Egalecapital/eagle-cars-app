@@ -9,6 +9,7 @@ import {
   type AdminNotification,
   type AdminStatusFilter,
   type BookingAccount,
+  type BookingChange,
   type BookingCustomerNotification,
   type BookingStatusEvent,
   getAdminBookingRequest,
@@ -18,16 +19,19 @@ import {
   isSearchableQuery,
   listAdminBookingRequests,
   listAdminCars,
+  listBookingChanges,
   listBookingCustomerNotifications,
   listBookingStatusEvents,
   listCarSchedule,
   listNotifications,
   listPushNotifications,
+  listTodayOperations,
   type NotificationStatus,
   type NotificationSummary,
   searchAdminBookingRequests,
 } from '@/services/admin-booking-service';
 import type { BookingRequest } from '@/types/booking';
+import { addDaysToKey, vnDateKey, vnDayStart } from '@/utils/vn-time';
 
 const AUTO_REFRESH_MS = 60 * 1000;
 const SEARCH_DEBOUNCE_MS = 400;
@@ -518,4 +522,50 @@ export function usePendingCount(enabled: boolean) {
   const { data, reload } = useAdminResource(countPendingBookings, 0, enabled, AUTO_REFRESH_MS);
 
   return { pendingCount: data, reload };
+}
+
+/** Nhật ký chỉnh sửa của một đơn (0015). */
+export function useBookingChanges(bookingId: string | undefined, enabled: boolean) {
+  const load = useCallback(
+    () => (bookingId ? listBookingChanges(bookingId) : Promise.resolve([])),
+    [bookingId]
+  );
+  const { data, error, reload } = useAdminResource<BookingChange[]>(load, [], enabled);
+
+  return { changes: data, error, reload };
+}
+
+export type TodayOperations = {
+  /** Đã quá giờ trả mà chưa bấm hoàn tất. */
+  overdue: BookingRequest[];
+  /** Giờ nhận nằm trong hôm nay (giờ VN). */
+  pickups: BookingRequest[];
+  /** Giờ trả nằm trong hôm nay và chưa tới. */
+  returns: BookingRequest[];
+  /** Đang cho thuê (đã tới giờ nhận, chưa tới giờ trả). */
+  ongoing: BookingRequest[];
+};
+
+const EMPTY_TODAY: TodayOperations = { overdue: [], pickups: [], returns: [], ongoing: [] };
+
+/** Việc cần làm hôm nay theo giờ VN; tự làm mới mỗi 60 giây. */
+export function useTodayOperations(enabled: boolean) {
+  const load = useCallback(async (): Promise<TodayOperations> => {
+    const now = Date.now();
+    const todayKey = vnDateKey(new Date(now));
+    const start = vnDayStart(todayKey).getTime();
+    const end = vnDayStart(addDaysToKey(todayKey, 1)).getTime();
+    const items = await listTodayOperations(new Date(end));
+    const ms = (iso: string) => new Date(iso).getTime();
+
+    return {
+      overdue: items.filter((item) => ms(item.returnAt) <= now),
+      pickups: items.filter((item) => ms(item.pickupAt) >= start && ms(item.pickupAt) < end),
+      returns: items.filter((item) => ms(item.returnAt) > now && ms(item.returnAt) < end),
+      ongoing: items.filter((item) => ms(item.pickupAt) <= now && ms(item.returnAt) > now),
+    };
+  }, []);
+  const { data, error, reload } = useAdminResource(load, EMPTY_TODAY, enabled, AUTO_REFRESH_MS);
+
+  return { today: data, error, reload };
 }

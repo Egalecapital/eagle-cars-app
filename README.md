@@ -54,6 +54,7 @@ Migration trong `supabase/migrations/`, chạy theo thứ tự (đã áp dụng 
 | `0013_customer_accounts_notifications.sql` | Tài khoản khách: chuyển đơn ẩn danh → tài khoản (mã một lần), thông báo trong app (trigger), push outbox + `pg_cron` mỗi phút (job `eagle-push-outbox`), xoá tài khoản (ẩn danh hoá đơn), RPC admin; FK `booking_requests.user_id` → `ON DELETE SET NULL` |
 | `0014_admin_offline_booking_guard.sql` | Cột `booking_requests.source` (app / admin), RPC `admin_create_booking` (admin nhập đơn ngoài app, mặc định xác nhận ngay), trigger chặn đơn trùng (`DUPLICATE_REQUEST`) và > 10 đơn / giờ / tài khoản (`TOO_MANY_REQUESTS`) |
 | `0015_admin_edit_booking.sql` | RPC `admin_update_booking` (sửa đơn chờ / đã xác nhận, chống ghi đè đồng thời, exclusion constraint chặn trùng), bảng `booking_change_events` (nhật ký sửa, không lưu giá trị thông tin cá nhân), thông báo khách `booking_updated`; `admin_create_booking` chặn tạo đơn CHỜ với giờ nhận đã qua |
+| `0016_telegram_admin_booking_message.sql` | Tin Telegram của đơn admin nhập có tiêu đề “ĐƠN ADMIN NHẬP” và ghi rõ không cần xử lý lại; tin đơn app giữ nguyên |
 
 Danh mục xe: Supabase (`public.cars`) quyết định xe nào đang cho thuê, tên và giá; `src/data/cars.ts`
 chỉ bổ sung ảnh / mô tả. Xe có trong database nhưng chưa có dữ liệu trong `cars.ts` sẽ chưa hiển thị.

@@ -20,6 +20,7 @@ import {
 } from '@/services/booking-service';
 import { getCarById } from '@/services/car-service';
 import { formatDateTime } from '@/utils/format-date';
+import { bookingPriceView } from '@/utils/booking-price';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
@@ -83,6 +84,7 @@ export default function RequestDetailScreen() {
   }
 
   const car = getCarById(request.carId);
+  const price = bookingPriceView(request);
 
   const handleCancel = async () => {
     if (!cancelArmed) {
@@ -190,34 +192,12 @@ export default function RequestDetailScreen() {
         )}
 
         <View style={styles.totalCard}>
-          {request.finalTotal !== null ? (
-            <>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Giá chính thức</Text>
-                <Text style={styles.totalValue}>
-                  {formatVnd(request.finalTotal)}
-                </Text>
-              </View>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>{price.label}</Text>
+            <Text style={styles.totalValue}>{formatVnd(price.amount)}</Text>
+          </View>
 
-              <Text style={styles.totalNote}>
-                Đã được Eagle Capital xác nhận. Tổng dự kiến ban đầu:{' '}
-                {formatVnd(request.estimatedTotal)}.
-              </Text>
-            </>
-          ) : (
-            <>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Tổng dự kiến</Text>
-                <Text style={styles.totalValue}>
-                  {formatVnd(request.estimatedTotal)}
-                </Text>
-              </View>
-
-              <Text style={styles.totalNote}>
-                Giá dự kiến. Eagle Capital sẽ xác nhận giá chính thức khi liên hệ.
-              </Text>
-            </>
-          )}
+          <Text style={styles.totalNote}>{price.note}</Text>
         </View>
 
         {request.status === 'pending' && (

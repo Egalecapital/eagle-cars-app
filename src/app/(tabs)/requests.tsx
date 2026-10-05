@@ -15,6 +15,7 @@ import { useMyBookingRequests } from '@/hooks/use-booking-requests';
 import { getCarById } from '@/services/car-service';
 import type { BookingRequest } from '@/types/booking';
 import { formatDateTime } from '@/utils/format-date';
+import { bookingPriceView } from '@/utils/booking-price';
 import { formatVnd } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
@@ -157,12 +158,8 @@ function RequestCard({ request, onPress }: RequestCardProps) {
 
       <View style={styles.cardFooter}>
         <View>
-          <Text style={styles.totalLabel}>
-            {request.finalTotal !== null ? 'Giá chính thức' : 'Tổng dự kiến'}
-          </Text>
-          <Text style={styles.totalValue}>
-            {formatVnd(request.finalTotal ?? request.estimatedTotal)}
-          </Text>
+          <Text style={styles.totalLabel}>{bookingPriceView(request).label}</Text>
+          <Text style={styles.totalValue}>{formatVnd(bookingPriceView(request).amount)}</Text>
         </View>
 
         <Text style={styles.detailLink}>Chi tiết ›</Text>

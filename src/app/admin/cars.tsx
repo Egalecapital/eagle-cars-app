@@ -1,41 +1,36 @@
 import { type Href, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 
-import { useAdminCars, useAdminGuard } from '@/hooks/use-admin';
-import {
-  type AdminCar,
-  AdminBookingError,
-  countUpcomingConfirmed,
-  updateAdminCar,
-} from '@/services/admin-booking-service';
-import { formatPricePerDay, formatVnd } from '@/utils/format-price';
+import { CarPhoto } from '@/components/car-photo';
+import { MaxContentWidth } from '@/constants/theme';
+import { useAdminGuard, useFleetCars } from '@/hooks/use-admin';
+import { type FleetCar, fleetServiceLabels } from '@/services/fleet-admin-service';
+import { formatPricePerDay } from '@/utils/format-price';
 import { goBackOr } from '@/utils/navigation';
 
 const GOLD = '#D4AF37';
-const MAX_PRICE = 1_000_000_000;
 
 // Typed routes đôi khi chỉ sinh '/admin/index'; URL thật của danh sách đơn là '/admin'.
 const ADMIN_HOME = '/admin' as Href;
 
-const toMessage = (error: unknown) =>
-  error instanceof AdminBookingError ? error.userMessage : 'Thao tác chưa thành công. Vui lòng thử lại.';
-
+/**
+ * XE & GIÁ — danh sách đội xe (0018). Thêm / sửa / ảnh / cho thuê / lưu trữ /
+ * xoá đều qua RPC admin; khách thấy thay đổi ngay, không cần sửa code.
+ */
 export default function AdminCarsScreen() {
   const router = useRouter();
   const ready = useAdminGuard();
-  const { cars, error, loading, reload } = useAdminCars(ready);
+  const { cars, error, loading, reload } = useFleetCars(ready);
+  const [showArchived, setShowArchived] = useState(false);
 
   if (!ready) {
     return (
@@ -45,14 +40,16 @@ export default function AdminCarsScreen() {
     );
   }
 
+  const current = cars.filter((car) => !car.archivedAt);
+  const archived = cars.filter((car) => !!car.archivedAt);
+  const activeCount = current.filter((car) => car.isActive).length;
+
+  const openCar = (carId: string) => router.push({ pathname: '/admin/car/[carId]', params: { carId } });
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} tintColor={GOLD} />}
       >
         <TouchableOpacity style={styles.backButton} onPress={() => goBackOr(router, ADMIN_HOME)}>
@@ -62,8 +59,16 @@ export default function AdminCarsScreen() {
         <Text style={styles.eyebrow}>EAGLE CAPITAL CARS</Text>
         <Text style={styles.title}>XE & GIÁ</Text>
         <Text style={styles.subtitle}>
-          Giá mới chỉ áp dụng cho đơn tạo sau khi lưu; đơn đã có giữ nguyên giá lúc đặt.
+          {activeCount}/{current.length} xe đang cho thuê. Bấm vào xe để sửa thông tin, giá, ảnh, bật/tắt
+          hoặc lưu trữ. Giá mới chỉ áp dụng cho đơn tạo sau khi lưu.
         </Text>
+
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => router.push('/admin/car/new')}
+        >
+          <Text style={styles.addButtonText}>+ THÊM XE</Text>
+        </TouchableOpacity>
 
         {!!error && (
           <View style={styles.errorBox}>
@@ -71,180 +76,79 @@ export default function AdminCarsScreen() {
           </View>
         )}
 
-        {loading && !error && <ActivityIndicator color={GOLD} style={styles.loader} />}
+        {loading && cars.length === 0 && !error && <ActivityIndicator color={GOLD} style={styles.loader} />}
 
-        {cars.map((car) => (
-          <CarEditor key={car.id} car={car} onSaved={reload} />
+        {current.map((car) => (
+          <CarRow key={car.id} car={car} onPress={() => openCar(car.id)} />
         ))}
+
+        {archived.length > 0 && (
+          <TouchableOpacity style={styles.archiveToggle} onPress={() => setShowArchived(!showArchived)}>
+            <Text style={styles.archiveToggleText}>
+              {showArchived ? '▾' : '▸'} Xe đã lưu trữ ({archived.length})
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {showArchived && archived.map((car) => <CarRow key={car.id} car={car} onPress={() => openCar(car.id)} />)}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
-function CarEditor({ car, onSaved }: { car: AdminCar; onSaved: () => void }) {
-  const [priceText, setPriceText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  // Xác nhận bật/tắt: undefined = chưa hỏi; number = số đơn confirmed sắp tới.
-  const [confirmToggle, setConfirmToggle] = useState<number | undefined>();
-  const busyRef = useRef(false);
-
-  const digits = priceText.replace(/\D/g, '');
-  const newPrice = digits ? Number(digits) : undefined;
-  const priceError =
-    priceText.trim() === ''
-      ? ''
-      : newPrice === undefined || newPrice < 1 || newPrice > MAX_PRICE
-        ? 'Giá/ngày phải từ 1đ đến 1.000.000.000đ (chỉ nhập số).'
-        : newPrice === car.pricePerDay
-          ? 'Giá mới đang bằng giá hiện tại.'
-          : '';
-
-  const run = async (price: number, active: boolean, success: string) => {
-    if (busyRef.current) return;
-
-    busyRef.current = true;
-    setBusy(true);
-    setError('');
-    setMessage('');
-
-    try {
-      await updateAdminCar(car.id, price, active);
-      setMessage(success);
-      setPriceText('');
-      setConfirmToggle(undefined);
-      onSaved();
-    } catch (saveError) {
-      setError(toMessage(saveError));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
-  };
-
-  const savePrice = () => {
-    if (!newPrice || priceError) {
-      setError(priceError || 'Vui lòng nhập giá mới.');
-      return;
-    }
-
-    run(newPrice, car.isActive, `Đã lưu giá mới ${formatPricePerDay(newPrice)}.`);
-  };
-
-  // Bấm lần 1: hỏi xác nhận (khi tắt thì đếm đơn confirmed sắp tới).
-  const askToggle = async () => {
-    setError('');
-    setMessage('');
-
-    if (!car.isActive) {
-      setConfirmToggle(0);
-      return;
-    }
-
-    try {
-      setBusy(true);
-      setConfirmToggle(await countUpcomingConfirmed(car.id));
-    } catch (countError) {
-      setError(toMessage(countError));
-    } finally {
-      setBusy(false);
-    }
-  };
+function CarRow({ car, onPress }: { car: FleetCar; onPress: () => void }) {
+  const status = car.archivedAt
+    ? { text: 'LƯU TRỮ', style: styles.badgeArchived }
+    : car.isActive
+      ? { text: 'ĐANG CHO THUÊ', style: styles.badgeOn }
+      : { text: 'ĐANG TẮT', style: styles.badgeOff };
 
   return (
-    <View style={[styles.card, !car.isActive && styles.cardInactive]}>
-      <View style={styles.cardTop}>
-        <Text style={styles.carName}>{car.name}</Text>
-        <Text style={[styles.badge, car.isActive ? styles.badgeOn : styles.badgeOff]}>
-          {car.isActive ? 'ĐANG CHO THUÊ' : 'ĐANG TẮT'}
+    <TouchableOpacity
+      style={[styles.card, !car.isActive && styles.cardInactive]}
+      activeOpacity={0.85}
+      onPress={onPress}
+    >
+      <CarPhoto source={car.image} style={styles.thumb} compact />
+
+      <View style={styles.cardInfo}>
+        <Text style={styles.carName} numberOfLines={2}>
+          {car.name}
         </Text>
-      </View>
-
-      <Text style={styles.price}>{formatPricePerDay(car.pricePerDay)}</Text>
-
-      <Text style={styles.label}>Giá/ngày mới (VNĐ)</Text>
-      <TextInput
-        value={priceText}
-        onChangeText={setPriceText}
-        placeholder={String(car.pricePerDay)}
-        placeholderTextColor="#666666"
-        keyboardType="number-pad"
-        style={styles.input}
-      />
-      {!!newPrice && !priceError && (
-        <Text style={styles.preview}>Sẽ lưu: {formatVnd(newPrice)}/ngày</Text>
-      )}
-      {!!priceError && <Text style={styles.fieldError}>{priceError}</Text>}
-
-      <TouchableOpacity
-        style={[styles.goldButton, (busy || !newPrice || !!priceError) && styles.disabled]}
-        onPress={savePrice}
-        disabled={busy || !newPrice || !!priceError}
-      >
-        <Text style={styles.goldButtonText}>LƯU GIÁ</Text>
-      </TouchableOpacity>
-
-      {confirmToggle === undefined ? (
-        <TouchableOpacity
-          style={[styles.outlineButton, busy && styles.disabled]}
-          onPress={askToggle}
-          disabled={busy}
-        >
-          <Text style={styles.outlineButtonText}>
-            {car.isActive ? 'TẠM NGỪNG CHO THUÊ' : 'MỞ LẠI CHO THUÊ'}
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.confirmBox}>
-          <Text style={styles.confirmText}>
-            {car.isActive
-              ? confirmToggle > 0
-                ? `⚠ Xe còn ${confirmToggle} đơn ĐÃ XÁC NHẬN sắp tới. Tắt xe chỉ chặn đơn mới; các đơn đó vẫn giữ nguyên. Xác nhận tạm ngừng cho thuê?`
-                : 'Xác nhận tạm ngừng cho thuê xe này? Khách sẽ không thấy và không đặt được xe.'
-              : 'Xác nhận mở lại cho thuê xe này?'}
-          </Text>
-          <View style={styles.confirmRow}>
-            <TouchableOpacity
-              style={[styles.confirmYes, busy && styles.disabled]}
-              disabled={busy}
-              onPress={() =>
-                run(
-                  car.pricePerDay,
-                  !car.isActive,
-                  car.isActive ? 'Đã tạm ngừng cho thuê.' : 'Đã mở lại cho thuê.'
-                )
-              }
-            >
-              <Text style={styles.confirmYesText}>XÁC NHẬN</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmNo}
-              disabled={busy}
-              onPress={() => setConfirmToggle(undefined)}
-            >
-              <Text style={styles.confirmNoText}>HUỶ</Text>
-            </TouchableOpacity>
-          </View>
+        <Text style={styles.price}>{formatPricePerDay(car.pricePerDay)}</Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {car.category} · {car.seats} chỗ · {fleetServiceLabels(car).join(', ')}
+        </Text>
+        <View style={styles.badges}>
+          <Text style={[styles.badge, status.style]}>{status.text}</Text>
+          {car.isFeatured && <Text style={[styles.badge, styles.badgeFeatured]}>NỔI BẬT</Text>}
+          {!car.image && <Text style={[styles.badge, styles.badgeOff]}>CHƯA CÓ ẢNH</Text>}
+          <Text style={styles.sort}>#{car.sortOrder}</Text>
         </View>
-      )}
-
-      {!!message && <Text style={styles.success}>{message}</Text>}
-      {!!error && <Text style={styles.fieldError}>{error}</Text>}
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#080808' },
   center: { flex: 1, backgroundColor: '#080808', alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingTop: 65, paddingBottom: 100 },
+  content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    padding: 20,
+    paddingTop: 65,
+    paddingBottom: 100,
+  },
   loader: { marginTop: 20 },
   backButton: { alignSelf: 'flex-start', marginBottom: 18 },
   backText: { color: GOLD, fontSize: 16, fontWeight: '800' },
   eyebrow: { color: GOLD, fontSize: 13, fontWeight: '900', letterSpacing: 2 },
   title: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', marginTop: 6 },
   subtitle: { color: '#888888', fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 14 },
+  addButton: { backgroundColor: GOLD, paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 16 },
+  addButtonText: { color: '#080808', fontWeight: '900', fontSize: 15 },
   errorBox: {
     backgroundColor: '#2A1414',
     borderWidth: 1,
@@ -255,58 +159,29 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#FFB4AE', fontSize: 14, lineHeight: 20 },
   card: {
+    flexDirection: 'row',
+    gap: 12,
     backgroundColor: '#151515',
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#303030',
-    padding: 16,
-    marginBottom: 14,
+    padding: 12,
+    marginBottom: 12,
   },
-  cardInactive: { borderStyle: 'dashed', opacity: 0.9 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  carName: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', flexShrink: 1 },
-  badge: { fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
+  cardInactive: { borderStyle: 'dashed' },
+  // alignSelf: hàng ngang mặc định kéo giãn chiều cao con → giữ đúng khung 16:10.
+  thumb: { width: 120, borderRadius: 10, alignSelf: 'center' },
+  cardInfo: { flex: 1, justifyContent: 'center' },
+  carName: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  price: { color: GOLD, fontSize: 15, fontWeight: '900', marginTop: 3 },
+  meta: { color: '#999999', fontSize: 12, marginTop: 3 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 },
+  badge: { fontSize: 10, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   badgeOn: { color: '#5CC98A', backgroundColor: 'rgba(92, 201, 138, 0.12)' },
   badgeOff: { color: '#FF8A80', backgroundColor: 'rgba(255, 138, 128, 0.12)' },
-  price: { color: GOLD, fontSize: 20, fontWeight: '900', marginTop: 6 },
-  label: { color: '#BBBBBB', fontSize: 13, fontWeight: '700', marginTop: 12, marginBottom: 6 },
-  input: {
-    minHeight: 48,
-    backgroundColor: '#0E0E0E',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  preview: { color: '#5CC98A', fontSize: 13, marginTop: 6 },
-  fieldError: { color: '#FF7B72', fontSize: 13, lineHeight: 19, marginTop: 6 },
-  success: { color: '#5CC98A', fontSize: 14, fontWeight: '700', marginTop: 10 },
-  goldButton: { backgroundColor: GOLD, paddingVertical: 13, borderRadius: 12, alignItems: 'center', marginTop: 12 },
-  goldButtonText: { color: '#080808', fontWeight: '900' },
-  outlineButton: {
-    borderWidth: 1.5,
-    borderColor: '#777777',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  outlineButtonText: { color: '#CCCCCC', fontWeight: '900' },
-  disabled: { opacity: 0.5 },
-  confirmBox: {
-    borderWidth: 1,
-    borderColor: GOLD,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 10,
-    backgroundColor: 'rgba(212, 175, 55, 0.08)',
-  },
-  confirmText: { color: '#FFFFFF', fontSize: 14, lineHeight: 20 },
-  confirmRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  confirmYes: { flex: 1, backgroundColor: GOLD, paddingVertical: 11, borderRadius: 10, alignItems: 'center' },
-  confirmYesText: { color: '#080808', fontWeight: '900' },
-  confirmNo: { flex: 1, borderWidth: 1.5, borderColor: '#777777', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  confirmNoText: { color: '#CCCCCC', fontWeight: '900' },
+  badgeArchived: { color: '#AAAAAA', backgroundColor: 'rgba(170, 170, 170, 0.12)' },
+  badgeFeatured: { color: GOLD, backgroundColor: 'rgba(212, 175, 55, 0.12)' },
+  sort: { color: '#666666', fontSize: 11, fontWeight: '700' },
+  archiveToggle: { paddingVertical: 12 },
+  archiveToggleText: { color: '#BBBBBB', fontSize: 15, fontWeight: '800' },
 });

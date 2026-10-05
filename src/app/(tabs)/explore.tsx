@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,38 +9,52 @@ import {
   View,
 } from 'react-native';
 
+import { CarPhoto } from '@/components/car-photo';
 import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
+import { CAR_CATEGORIES, SERVICE_OPTIONS } from '@/constants/car-options';
+import { MaxContentWidth } from '@/constants/theme';
 import { useCarCatalog } from '@/hooks/use-car-catalog';
+import type { Car } from '@/types/car';
+import { carMeta } from '@/utils/car-terms';
 import { formatPricePerDay } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
 
-const filters = ['Tất cả', 'Xe sang', 'SUV', 'Sedan', 'Tự lái', 'Xe cưới'];
+const ALL = 'Tất cả';
+
+/** Bộ lọc lấy từ chính danh mục: chỉ hiện dòng xe / hình thức đang có xe. */
+function buildFilters(cars: Car[]): string[] {
+  const categories = CAR_CATEGORIES.filter((category) => cars.some((car) => car.category === category));
+  const services = SERVICE_OPTIONS.map((option) => option.label).filter((label) =>
+    cars.some((car) => car.serviceTypes.includes(label))
+  );
+
+  return [ALL, ...categories, ...services];
+}
+
+const matchesFilter = (car: Car, filter: string) =>
+  filter === ALL ||
+  car.category === filter ||
+  car.serviceTypes.some((service) => service === filter);
 
 export default function ExploreScreen() {
   const router = useRouter();
 
-  const [selectedFilter, setSelectedFilter] = useState('Tất cả');
+  const [pickedFilter, setSelectedFilter] = useState(ALL);
   const [search, setSearch] = useState('');
 
-  // Danh mục từ Supabase (xe active, tên, giá) + ảnh/mô tả trong app.
+  // Danh mục từ Supabase (xe active; mọi thông tin xe do admin quản lý).
   const catalog = useCarCatalog();
+  const filters = buildFilters(catalog.cars);
+  // Bộ lọc đang chọn không còn xe nào (admin vừa đổi) → về "Tất cả".
+  const selectedFilter = filters.includes(pickedFilter) ? pickedFilter : ALL;
+  const term = search.trim().toLowerCase();
 
-  const filteredCars = catalog.cars.filter((car) => {
-    const matchesFilter =
-      selectedFilter === 'Tất cả' ||
-      (selectedFilter === 'Tự lái'
-        ? car.serviceTypes.includes('Tự lái')
-        : selectedFilter === 'Xe cưới'
-          ? car.serviceTypes.includes('Xe cưới')
-          : car.category === selectedFilter);
-
-    const matchesSearch = car.name
-      .toLowerCase()
-      .includes(search.trim().toLowerCase());
-
-    return matchesFilter && matchesSearch;
-  });
+  const filteredCars = catalog.cars.filter(
+    (car) =>
+      matchesFilter(car, selectedFilter) &&
+      [car.name, car.brand, car.model].some((text) => text.toLowerCase().includes(term))
+  );
 
   const openCarDetail = (id: string) => {
     router.push({
@@ -122,11 +135,7 @@ export default function ExploreScreen() {
             style={styles.card}
           >
             <View style={styles.imageArea}>
-              <Image
-                source={car.image}
-                style={styles.carImage}
-                resizeMode="cover"
-              />
+              <CarPhoto source={car.image} />
 
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
@@ -141,7 +150,7 @@ export default function ExploreScreen() {
               </Text>
 
               <Text style={styles.carMeta}>
-                {car.year} • {car.seats} chỗ • {car.transmission}
+                {carMeta(car)}
               </Text>
 
               <Text style={styles.price}>
@@ -209,6 +218,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     paddingTop: 70,
     paddingHorizontal: 20,
   },
@@ -306,13 +318,7 @@ const styles = StyleSheet.create({
   },
 
   imageArea: {
-    height: 220,
     backgroundColor: '#202020',
-  },
-
-  carImage: {
-    width: '100%',
-    height: '100%',
   },
 
   badge: {

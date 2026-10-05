@@ -30,6 +30,7 @@ import {
   type NotificationSummary,
   searchAdminBookingRequests,
 } from '@/services/admin-booking-service';
+import { type FleetCar, getFleetCar, listFleetCars } from '@/services/fleet-admin-service';
 import type { BookingRequest } from '@/types/booking';
 import { addDaysToKey, vnDateKey, vnDayStart } from '@/utils/vn-time';
 
@@ -568,4 +569,26 @@ export function useTodayOperations(enabled: boolean) {
   const { data, error, reload } = useAdminResource(load, EMPTY_TODAY, enabled, AUTO_REFRESH_MS);
 
   return { today: data, error, reload };
+}
+
+/** Đội xe (0018): mọi xe, kể cả đang tắt / lưu trữ. */
+export function useFleetCars(enabled: boolean) {
+  const { data, loading, error, reload } = useAdminResource<FleetCar[]>(listFleetCars, [], enabled);
+
+  return { cars: data, loading, error, reload };
+}
+
+/** Một xe trong đội xe (undefined = không tìm thấy). */
+export function useFleetCar(carId: string | undefined, enabled: boolean) {
+  const load = useCallback(
+    () => (carId ? getFleetCar(carId) : Promise.resolve(undefined)),
+    [carId]
+  );
+  const { data, loading, error, reload } = useAdminResource<FleetCar | undefined>(
+    load,
+    undefined,
+    enabled
+  );
+
+  return { car: data, loading, error, reload };
 }

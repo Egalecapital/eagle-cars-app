@@ -6,11 +6,14 @@ import {
 import { goBackOr } from '@/utils/navigation';
 import { useCarAvailability } from '@/hooks/use-car-availability';
 import { ContactInline } from '@/components/contact-inline';
+import { CarPhoto } from '@/components/car-photo';
 import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
+import { MaxContentWidth } from '@/constants/theme';
 import { useCatalogCar } from '@/hooks/use-car-catalog';
 import type { BookingRequest, BookingRequestInput } from '@/types/booking';
 import type { ServiceType } from '@/types/car';
 import { formatDateTime as formatIsoDateTime } from '@/utils/format-date';
+import { carRentalTerms } from '@/utils/car-terms';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
 import {
     addDaysToKey,
@@ -22,7 +25,6 @@ import {
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -544,11 +546,7 @@ export default function BookingScreen() {
 
         {/* A. Thông tin xe */}
         <View style={styles.carCard}>
-          <Image
-            source={car.image}
-            style={styles.carImage}
-            resizeMode="cover"
-          />
+          <CarPhoto source={car.image} />
 
           <View style={styles.carInfo}>
             <Text style={styles.carName}>{car.name}</Text>
@@ -785,6 +783,9 @@ export default function BookingScreen() {
             label="Số ngày dự kiến"
             value={rentalDays ? `${rentalDays} ngày` : '—'}
           />
+          {carRentalTerms(car).map((term) => (
+            <SummaryRow key={term.label} label={term.label} value={term.value} />
+          ))}
 
           <View style={styles.divider} />
 
@@ -958,6 +959,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     padding: 20,
     paddingTop: 65,
     paddingBottom: 100,
@@ -1029,12 +1033,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#303030',
-  },
-
-  carImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#202020',
   },
 
   carInfo: {

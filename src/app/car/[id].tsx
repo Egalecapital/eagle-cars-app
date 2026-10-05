@@ -1,11 +1,13 @@
 import { goBackOr } from '@/utils/navigation';
+import { CarPhoto } from '@/components/car-photo';
 import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
+import { MaxContentWidth } from '@/constants/theme';
 import { useCatalogCar } from '@/hooks/use-car-catalog';
 import { getCarBenefits } from '@/services/car-service';
+import { carRentalTerms, carSubtitle } from '@/utils/car-terms';
 import { formatPricePerDay } from '@/utils/format-price';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -93,11 +95,7 @@ export default function CarDetailScreen() {
         </TouchableOpacity>
 
         <View style={styles.imageBox}>
-          <Image
-            source={car.image}
-            style={styles.carImage}
-            resizeMode="cover"
-          />
+          <CarPhoto source={car.image} />
 
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryBadgeText}>
@@ -112,25 +110,34 @@ export default function CarDetailScreen() {
 
         <Text style={styles.name}>{car.name}</Text>
 
+        {!!carSubtitle(car) && <Text style={styles.subtitle}>{carSubtitle(car)}</Text>}
+
         <Text style={styles.price}>
           {formatPricePerDay(car.pricePerDay)}
         </Text>
 
-        <Text style={styles.description}>
-          {car.description}
-        </Text>
+        {!!car.description && (
+          <Text style={styles.description}>
+            {car.description}
+          </Text>
+        )}
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Thông tin xe</Text>
 
           <InfoRow
-            label="Dòng xe"
+            label="Phân khúc"
             value={car.category}
           />
 
           <InfoRow
             label="Số chỗ"
             value={`${car.seats} chỗ`}
+          />
+
+          <InfoRow
+            label="Hộp số / nhiên liệu"
+            value={`${car.transmission} • ${car.fuelType}`}
           />
 
           <View style={styles.lastInfoRow}>
@@ -142,8 +149,24 @@ export default function CarDetailScreen() {
           </View>
         </View>
 
-        <View style={styles.featureBox}>
-          <Text style={styles.infoTitle}>Điểm nổi bật</Text>
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>Điều kiện thuê</Text>
+
+          {carRentalTerms(car).map((term, index, terms) =>
+            index === terms.length - 1 ? (
+              <View key={term.label} style={styles.lastInfoRow}>
+                <Text style={styles.infoLabel}>{term.label}</Text>
+                <Text style={styles.infoValue}>{term.value}</Text>
+              </View>
+            ) : (
+              <InfoRow key={term.label} label={term.label} value={term.value} />
+            )
+          )}
+        </View>
+
+        {car.features.length > 0 && (
+          <View style={styles.featureBox}>
+            <Text style={styles.infoTitle}>Điểm nổi bật</Text>
 
           {car.features.map((feature) => (
             <View
@@ -157,7 +180,8 @@ export default function CarDetailScreen() {
               </Text>
             </View>
           ))}
-        </View>
+          </View>
+        )}
 
         <View style={styles.benefitBox}>
           <Text style={styles.infoTitle}>
@@ -222,9 +246,19 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     padding: 20,
     paddingTop: 65,
     paddingBottom: 100,
+  },
+
+  subtitle: {
+    color: '#999999',
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 8,
   },
 
   topBackButton: {
@@ -239,18 +273,12 @@ const styles = StyleSheet.create({
   },
 
   imageBox: {
-    height: 280,
     backgroundColor: '#202020',
     borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#333333',
     marginBottom: 24,
-  },
-
-  carImage: {
-    width: '100%',
-    height: '100%',
   },
 
   categoryBadge: {

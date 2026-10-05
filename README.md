@@ -55,9 +55,14 @@ Migration trong `supabase/migrations/`, chạy theo thứ tự (đã áp dụng 
 | `0014_admin_offline_booking_guard.sql` | Cột `booking_requests.source` (app / admin), RPC `admin_create_booking` (admin nhập đơn ngoài app, mặc định xác nhận ngay), trigger chặn đơn trùng (`DUPLICATE_REQUEST`) và > 10 đơn / giờ / tài khoản (`TOO_MANY_REQUESTS`) |
 | `0015_admin_edit_booking.sql` | RPC `admin_update_booking` (sửa đơn chờ / đã xác nhận, chống ghi đè đồng thời, exclusion constraint chặn trùng), bảng `booking_change_events` (nhật ký sửa, không lưu giá trị thông tin cá nhân), thông báo khách `booking_updated`; `admin_create_booking` chặn tạo đơn CHỜ với giờ nhận đã qua |
 | `0016_telegram_admin_booking_message.sql` | Tin Telegram của đơn admin nhập có tiêu đề “ĐƠN ADMIN NHẬP” và ghi rõ không cần xử lý lại; tin đơn app giữ nguyên |
+| `0017_car_images_storage.sql` | Cột `cars.image_url` (chỉ nhận URL công khai của bucket `car-images`), bucket Storage `car-images` public read — không có policy ghi (chỉ upload qua Dashboard) |
+| `0018_fleet_admin.sql` | Quản trị đội xe: thông tin xe trong database (hãng, dòng, năm, phân khúc, số chỗ, nhiên liệu, hộp số, hình thức thuê, mô tả, tính năng, nổi bật, thứ tự, cọc, km/ngày, phụ phí km, lưu trữ); RPC `admin_create_car` / `admin_update_car_details` / `admin_set_car_active` / `admin_set_car_image` / `admin_archive_car` / `admin_delete_car` (chống ghi đè đồng thời, chỉ xoá xe chưa từng có đơn); bảng `car_change_events` (nhật ký); trigger chặn đơn mới sai hình thức thuê (`SERVICE_NOT_AVAILABLE`) / xe đã lưu trữ (`CAR_ARCHIVED`); policy Storage: chỉ admin upload / xoá ảnh trong `car-images/cars/<id-xe>/` |
 
-Danh mục xe: Supabase (`public.cars`) quyết định xe nào đang cho thuê, tên và giá; `src/data/cars.ts`
-chỉ bổ sung ảnh / mô tả. Xe có trong database nhưng chưa có dữ liệu trong `cars.ts` sẽ chưa hiển thị.
+Danh mục xe: Supabase (`public.cars`) là nguồn duy nhất (0018): xe nào đang cho thuê, thứ tự, mọi thông
+tin hiển thị và điều kiện thuê. Admin thêm / sửa xe trong **Admin → XE & GIÁ**, khách thấy ngay — không
+sửa code, không build / deploy. `src/data/cars.ts` chỉ còn ảnh dự phòng cho 5 xe ban đầu.
+**Thứ tự triển khai:** chạy migration 0018 TRƯỚC khi phát hành bản app / web có code 0018 (bản mới đọc
+các cột của 0018; database chưa có cột → danh sách xe báo lỗi tải).
 
 Tìm đơn theo số điện thoại / tên hiện quét toàn bảng (đủ nhanh ở quy mô hiện tại). Khi bảng vượt khoảng
 50.000 đơn, cân nhắc `pg_trgm` + index GIN. Tìm theo tên phân biệt dấu ("nguyen" không khớp "Nguyễn").
@@ -80,6 +85,38 @@ where u.id = '<ADMIN_USER_UUID>'::uuid
   and coalesce(u.is_anonymous, false) = false
 on conflict (user_id) do nothing;
 ```
+
+## Quản trị đội xe (Admin → XE & GIÁ)
+
+- **Thêm xe:** nhập tên, mã xe (đường dẫn, tự gợi ý), giá, thông tin, hình thức thuê, điều kiện thuê.
+  Xe mới tạo ở trạng thái CHƯA cho thuê → thêm ảnh, kiểm tra, bấm “Mở cho thuê”.
+- **Sửa:** mọi thông tin + giá. Giá mới chỉ áp dụng cho đơn tạo sau khi lưu (đơn đã có giữ giá lúc đặt).
+  Bỏ một hình thức thuê chỉ chặn đơn mới. Hai người sửa cùng lúc → người lưu sau nhận thông báo tải lại.
+- **Tạm ngừng / mở cho thuê**, **Lưu trữ** (ngừng kinh doanh: ẩn, không nhận đơn mới, giữ lịch sử đơn),
+  **Xoá** (chỉ xe chưa từng có đơn). Mọi thay đổi ghi nhật ký `car_change_events`.
+- Giá vẫn là một `price_per_day` cho mọi hình thức thuê. Khi cần giá riêng theo hình thức: thêm bảng
+  `car_service_prices (car_id, service_type, price_per_day)` + sửa `create_booking_request` /
+  `admin_create_booking` lấy giá theo hình thức (fallback `price_per_day`) — các cột hiện tại giữ nguyên.
+
+## Ảnh xe
+
+- Khung hiển thị chuẩn 16:10, ảnh hiển thị trọn xe (không phóng / cắt) trên web và app.
+- **Đổi ảnh từ Admin** (điện thoại hoặc máy tính): Sửa xe → Chọn ảnh → app tự cắt 16:10 (phần giữa), thu về
+  tối đa 1600px, nén JPEG → tải lên `car-images/cars/<id-xe>/<uuid>.jpg` → gắn cho xe → xoá ảnh cũ.
+  Web + App dùng ảnh mới ngay. “Bỏ ảnh” → quay về ảnh repo (5 xe ban đầu) hoặc khung chờ ảnh.
+- Chỉ admin upload / xoá được (policy Storage 0018); khách / anon chỉ xem ảnh công khai.
+- Ảnh dự phòng trong repo: `assets/images/cars/` (gắn trong `src/data/cars.ts`).
+- App iOS / Android: thêm `expo-image-picker` + `expo-image-manipulator` (module native) → cần build
+  mới (EAS Build) để dùng chức năng chọn ảnh trên app; web dùng được ngay sau khi deploy.
+
+## Web Production
+
+- **EAS Hosting:** https://eagle-cars-app.expo.app — `npx expo export --platform web` rồi
+  `npx eas-cli@latest deploy --prod` (app.json: `web.output` = `"server"` để route động chạy).
+- **Shared hosting (OnePanel, https://eaglecapital.vn):** `npm run build:web-hosting` → build tĩnh
+  (`EAGLE_WEB_OUTPUT=static`, xem `app.config.js`) + `.htaccess` rewrite từng route động về trang mẫu
+  của Expo Router + quét secret → `web-hosting-build/eagle-cars-web-<ngày-giờ>.zip`. Giải nén ZIP vào
+  `public_html` (index.html và .htaccess nằm ngay trong public_html). Cấu hình EAS không bị ảnh hưởng.
 
 ## Cấu hình bên ngoài (bắt buộc trước khi dùng thật)
 

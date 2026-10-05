@@ -13,7 +13,7 @@ export type CatalogStatus = 'loading' | 'ready' | 'error';
 type CatalogState = { status: CatalogStatus; catalog?: CarCatalog };
 
 /**
- * Danh mục xe đang cho thuê (Supabase + dữ liệu trình bày trong app).
+ * Danh mục xe đang cho thuê (toàn bộ từ Supabase public.cars, 0018).
  * Tải lại mỗi khi màn hình được mở. Khi chưa từng tải được → 'error'
  * (không tự coi xe nào là đang cho thuê).
  */

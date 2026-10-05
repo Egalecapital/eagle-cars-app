@@ -48,3 +48,6 @@ example
 # Khoá service account (FCM / Google Play) — tải lên EAS, KHÔNG commit
 *-firebase-adminsdk-*.json
 *service-account*.json
+
+# Bản build web cho shared hosting (npm run build:web-hosting)
+web-hosting-build/

@@ -91,7 +91,13 @@ export function AdminBookingForm({ cars, booking, busy, submitLabel, onSubmit }:
   const days = rangeValid
     ? Math.max(1, Math.ceil((returnAt.getTime() - pickupAt.getTime()) / MS_PER_DAY))
     : 0;
+  // Xe lưu trữ không nhận đơn mới; khi sửa đơn vẫn hiện xe hiện tại của đơn.
+  const selectableCars = cars.filter((item) => !item.archivedAt || item.id === booking?.carId);
   const car = cars.find((item) => item.id === carId);
+  const serviceOffered = !car || car.serviceTypes.includes(service);
+  // Sửa đơn, giữ nguyên xe + hình thức → server không kiểm tra lại hình thức (đơn cũ vẫn sửa được).
+  const keepsBookingService =
+    !!booking && carId === booking.carId && SERVICES.find((item) => item.value === service)?.label === booking.serviceType;
   // Giữ xe → giữ giá/ngày đã chốt lúc đặt; đổi xe → giá xe mới (giống server).
   const pricePerDay = booking && carId === booking.carId ? booking.pricePerDay : car?.pricePerDay;
   const finalDigits = finalTotalText.replace(/\D/g, '');
@@ -113,6 +119,8 @@ export function AdminBookingForm({ cars, booking, busy, submitLabel, onSubmit }:
 
   const problems = [
     !carId && 'Chọn xe.',
+    car?.archivedAt && carId !== booking?.carId && 'Xe đã lưu trữ, không nhận đơn mới.',
+    !serviceOffered && !keepsBookingService && 'Xe này không có hình thức thuê đã chọn.',
     (!pickupAt || !returnAt) && 'Nhập ngày (DD/MM/YYYY) và giờ (HH:MM) nhận / trả hợp lệ.',
     pickupAt && returnAt && returnAt <= pickupAt && 'Giờ trả phải sau giờ nhận.',
     days > 30 && 'Mỗi đơn tối đa 30 ngày.',
@@ -150,7 +158,7 @@ export function AdminBookingForm({ cars, booking, busy, submitLabel, onSubmit }:
     <View>
       <Text style={styles.label}>Xe</Text>
       <View style={styles.chips}>
-        {cars.map((item) => (
+        {selectableCars.map((item) => (
           <TouchableOpacity
             key={item.id}
             style={[styles.chip, carId === item.id && styles.chipActive]}
@@ -158,7 +166,7 @@ export function AdminBookingForm({ cars, booking, busy, submitLabel, onSubmit }:
           >
             <Text style={[styles.chipText, carId === item.id && styles.chipTextActive]}>
               {item.name}
-              {item.isActive ? '' : ' (đang tắt)'}
+              {item.archivedAt ? ' (lưu trữ)' : item.isActive ? '' : ' (đang tắt)'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -169,11 +177,16 @@ export function AdminBookingForm({ cars, booking, busy, submitLabel, onSubmit }:
         {SERVICES.map((item) => (
           <TouchableOpacity
             key={item.value}
-            style={[styles.chip, service === item.value && styles.chipActive]}
+            style={[
+              styles.chip,
+              service === item.value && styles.chipActive,
+              !!car && !car.serviceTypes.includes(item.value) && styles.chipUnavailable,
+            ]}
             onPress={() => setService(item.value)}
           >
             <Text style={[styles.chipText, service === item.value && styles.chipTextActive]}>
               {item.label}
+              {car && !car.serviceTypes.includes(item.value) ? ' (xe không có)' : ''}
             </Text>
           </TouchableOpacity>
         ))}
@@ -303,6 +316,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  chipUnavailable: { opacity: 0.45 },
   chipActive: { backgroundColor: GOLD, borderColor: GOLD },
   chipText: { color: '#AAAAAA', fontWeight: '700', fontSize: 13 },
   chipTextActive: { color: '#080808' },

@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import {
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,17 +7,20 @@ import {
   View,
 } from 'react-native';
 
+import { CarPhoto } from '@/components/car-photo';
 import { CatalogError, CatalogLoading, CatalogStaleNotice } from '@/components/catalog-status';
 import { CONTACT_PHONE_DISPLAY } from '@/constants/contact';
+import { MaxContentWidth } from '@/constants/theme';
 import { useCarCatalog } from '@/hooks/use-car-catalog';
 import { callEagleCapital, openEagleCapitalZalo } from '@/utils/contact';
+import { carMeta } from '@/utils/car-terms';
 import { formatPricePerDay } from '@/utils/format-price';
 
 const GOLD = '#D4AF37';
 
 export default function HomeScreen() {
   const router = useRouter();
-  // Danh mục từ Supabase (xe active, tên, giá) + ảnh/mô tả trong app.
+  // Danh mục từ Supabase (xe active; thông tin, thứ tự, xe nổi bật do admin quản lý).
   const catalog = useCarCatalog();
   const cars = catalog.cars.filter((car) => car.isFeatured);
 
@@ -104,11 +106,7 @@ export default function HomeScreen() {
             key={car.id}
           >
             <View style={styles.carImageContainer}>
-              <Image
-                source={car.image}
-                style={styles.carImage}
-                resizeMode="cover"
-              />
+              <CarPhoto source={car.image} />
 
               <View style={styles.categoryBadge}>
                 <Text style={styles.categoryText}>
@@ -123,7 +121,7 @@ export default function HomeScreen() {
               </Text>
 
               <Text style={styles.carMeta}>
-                {car.year} • {car.seats} chỗ • {car.transmission}
+                {carMeta(car)}
               </Text>
 
               <Text style={styles.carPrice}>
@@ -220,6 +218,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     paddingTop: 70,
     paddingHorizontal: 20,
     paddingBottom: 120,
@@ -315,13 +316,7 @@ const styles = StyleSheet.create({
   },
 
   carImageContainer: {
-    height: 220,
     backgroundColor: '#202020',
-  },
-
-  carImage: {
-    width: '100%',
-    height: '100%',
   },
 
   categoryBadge: {

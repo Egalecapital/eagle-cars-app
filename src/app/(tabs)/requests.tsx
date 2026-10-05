@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,9 +10,13 @@ import {
 } from 'react-native';
 
 import { BookingStatusBadge } from '@/components/booking-status-badge';
+import { CarPhoto } from '@/components/car-photo';
+import { MaxContentWidth } from '@/constants/theme';
 import { useMyBookingRequests } from '@/hooks/use-booking-requests';
-import { getCarById } from '@/services/car-service';
+import { useCarCatalog } from '@/hooks/use-car-catalog';
+import { carImageFor } from '@/services/car-service';
 import type { BookingRequest } from '@/types/booking';
+import type { Car } from '@/types/car';
 import { formatDateTime } from '@/utils/format-date';
 import { bookingPriceView } from '@/utils/booking-price';
 import { formatVnd } from '@/utils/format-price';
@@ -23,6 +26,8 @@ const GOLD = '#D4AF37';
 export default function MyRequestsScreen() {
   const router = useRouter();
   const { requests, loading, refreshing, error, reload } = useMyBookingRequests();
+  // Ảnh xe: ảnh Storage của danh mục hiện tại nếu có, nếu không thì ảnh trong repo.
+  const { cars: catalogCars } = useCarCatalog();
 
   const openRequest = (requestId: string) => {
     router.push({
@@ -90,6 +95,7 @@ export default function MyRequestsScreen() {
 
             {requests.map((request) => (
               <RequestCard
+                image={carImageFor(request.carId, catalogCars)}
                 key={request.id}
                 request={request}
                 onPress={() => openRequest(request.id)}
@@ -111,11 +117,11 @@ export default function MyRequestsScreen() {
 
 type RequestCardProps = {
   request: BookingRequest;
+  image: Car['image'] | undefined;
   onPress: () => void;
 };
 
-function RequestCard({ request, onPress }: RequestCardProps) {
-  const car = getCarById(request.carId);
+function RequestCard({ request, image, onPress }: RequestCardProps) {
 
   return (
     <TouchableOpacity
@@ -124,15 +130,7 @@ function RequestCard({ request, onPress }: RequestCardProps) {
       onPress={onPress}
     >
       <View style={styles.cardTop}>
-        {car ? (
-          <Image
-            source={car.image}
-            style={styles.carImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.carImage} />
-        )}
+        <CarPhoto source={image} style={styles.carImage} compact />
 
         <View style={styles.cardTopInfo}>
           <BookingStatusBadge status={request.status} />
@@ -191,6 +189,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     paddingTop: 70,
     paddingHorizontal: 20,
     paddingBottom: 120,
@@ -327,10 +328,10 @@ const styles = StyleSheet.create({
   },
 
   carImage: {
-    width: 110,
-    height: 82,
+    width: 120,
     borderRadius: 12,
-    backgroundColor: '#202020',
+    // Hàng ngang mặc định kéo giãn chiều cao con → giữ đúng khung 16:10.
+    alignSelf: 'center',
   },
 
   cardTopInfo: {

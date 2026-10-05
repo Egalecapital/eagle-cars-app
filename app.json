@@ -48,6 +48,14 @@
           "color": "#D4AF37",
           "defaultChannel": "default"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Eagle Cars cần truy cập ảnh để quản trị viên tải ảnh xe lên.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

@@ -72,6 +72,8 @@ const BACKEND_ERROR_MESSAGES: Record<string, string> = {
   NOT_AUTHENTICATED:
     'Phiên kết nối đã hết hạn. Vui lòng đóng hẳn ứng dụng, mở lại rồi thử gửi lại.',
   CAR_NOT_AVAILABLE: 'Xe này hiện chưa nhận đặt. Vui lòng chọn xe khác.',
+  CAR_ARCHIVED: 'Xe này đã ngừng kinh doanh. Vui lòng chọn xe khác.',
+  SERVICE_NOT_AVAILABLE: 'Xe này không có hình thức thuê đã chọn. Vui lòng chọn lại hình thức thuê.',
   INVALID_SERVICE_TYPE: 'Hình thức thuê không hợp lệ. Vui lòng chọn lại.',
   INVALID_TIME_RANGE: 'Thời gian trả xe phải sau thời gian nhận xe.',
   PICKUP_IN_PAST: 'Thời gian nhận xe phải sau thời điểm hiện tại.',

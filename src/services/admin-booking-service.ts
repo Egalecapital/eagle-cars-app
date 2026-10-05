@@ -5,6 +5,7 @@
  *   cho admin thấy mọi đơn. Lịch sử: SELECT booking_status_events (0004).
  * - Tìm đơn, theo dõi thông báo Telegram: RPC 0012 (kiểm tra admin bên trong).
  * - Ghi: CHỈ qua RPC (0005, 0006, 0011, 0012). App không có quyền UPDATE trực tiếp.
+ * - Quản trị đội xe (thêm / sửa / ảnh / lưu trữ): fleet-admin-service.ts (0018).
  */
 
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -17,6 +18,7 @@ import {
   UUID_PATTERN,
 } from '@/services/booking-service';
 import type { BookingRequest, BookingStatus } from '@/types/booking';
+import type { ServiceTypeKey } from '@/types/car';
 
 const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   NOT_ADMIN: 'Tài khoản không có quyền quản trị. Vui lòng đăng nhập lại.',
@@ -38,6 +40,8 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   INVALID_PRICE: 'Giá/ngày phải từ 1đ đến 1.000.000.000đ.',
   INVALID_ACTIVE: 'Trạng thái cho thuê không hợp lệ.',
   CAR_NOT_FOUND: 'Không tìm thấy xe này.',
+  CAR_ARCHIVED: 'Xe đã lưu trữ (ngừng kinh doanh). Bỏ lưu trữ trong XE & GIÁ trước khi dùng lại.',
+  SERVICE_NOT_AVAILABLE: 'Xe này không có hình thức thuê đã chọn. Chọn hình thức khác hoặc bật hình thức đó trong XE & GIÁ.',
   INVALID_QUERY: 'Nhập ít nhất 2 ký tự (hoặc 4 chữ số điện thoại), tối đa 100 ký tự.',
   INVALID_STATUS: 'Bộ lọc trạng thái không hợp lệ.',
   INVALID_SERVICE_TYPE: 'Vui lòng chọn hình thức thuê.',
@@ -68,7 +72,7 @@ export class AdminBookingError extends Error {
   }
 }
 
-function toAdminError(error: PostgrestError): AdminBookingError {
+export function toAdminError(error: PostgrestError): AdminBookingError {
   if (!error.code) {
     return new AdminBookingError(NETWORK_ERROR_MESSAGE, { cause: error });
   }
@@ -235,11 +239,16 @@ export async function expireStaleBookingRequests(): Promise<void> {
   await supabase.rpc('expire_stale_booking_requests');
 }
 
+/** Xe để chọn khi admin nhập / sửa đơn. */
 export type AdminCar = {
   id: string;
   name: string;
   pricePerDay: number;
   isActive: boolean;
+  /** 0018: xe đã lưu trữ không nhận đơn mới. */
+  archivedAt: string | null;
+  /** 0018: hình thức thuê xe này có (server kiểm tra lại khi lưu đơn). */
+  serviceTypes: ServiceTypeKey[];
   updatedAt: string;
 };
 
@@ -248,6 +257,8 @@ type AdminCarRow = {
   name: string;
   price_per_day: number;
   is_active: boolean;
+  archived_at: string | null;
+  service_types: string[];
   updated_at: string;
 };
 
@@ -256,15 +267,18 @@ const toAdminCar = (row: AdminCarRow): AdminCar => ({
   name: row.name,
   pricePerDay: Number(row.price_per_day),
   isActive: row.is_active,
+  archivedAt: row.archived_at,
+  serviceTypes: row.service_types as ServiceTypeKey[],
   updatedAt: row.updated_at,
 });
 
-/** Tất cả xe, kể cả đang tắt (policy cars_select_admin, 0011). */
+/** Tất cả xe, kể cả đang tắt / lưu trữ (policy cars_select_admin, 0011). */
 export async function listAdminCars(): Promise<AdminCar[]> {
   const { data, error } = await supabase
     .from('cars')
-    .select('id, name, price_per_day, is_active, updated_at')
-    .order('name', { ascending: true });
+    .select('id, name, price_per_day, is_active, archived_at, service_types, updated_at')
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     throw toAdminError(error);
@@ -287,28 +301,6 @@ export async function countUpcomingConfirmed(carId: string): Promise<number> {
   }
 
   return count ?? 0;
-}
-
-/**
- * Đổi giá / bật-tắt xe (RPC 0011). Không ảnh hưởng đơn đã tạo
- * (mỗi đơn lưu price_per_day lúc đặt).
- */
-export async function updateAdminCar(
-  carId: string,
-  pricePerDay: number,
-  isActive: boolean
-): Promise<AdminCar> {
-  const { data, error } = await supabase.rpc('admin_update_car', {
-    p_car_id: carId,
-    p_price_per_day: pricePerDay,
-    p_is_active: isActive,
-  });
-
-  if (error) {
-    throw toAdminError(error);
-  }
-
-  return toAdminCar(data as AdminCarRow);
 }
 
 /**

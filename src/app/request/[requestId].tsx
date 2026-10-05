@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,13 +11,16 @@ import {
 
 import { goBackOr } from '@/utils/navigation';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
+import { CarPhoto } from '@/components/car-photo';
+import { MaxContentWidth } from '@/constants/theme';
 import { ContactInline } from '@/components/contact-inline';
 import { useBookingRequest } from '@/hooks/use-booking-requests';
+import { useCarCatalog } from '@/hooks/use-car-catalog';
 import {
   BookingServiceError,
   cancelMyBookingRequest,
 } from '@/services/booking-service';
-import { getCarById } from '@/services/car-service';
+import { carImageFor } from '@/services/car-service';
 import { formatDateTime } from '@/utils/format-date';
 import { bookingPriceView } from '@/utils/booking-price';
 import { formatPricePerDay, formatVnd } from '@/utils/format-price';
@@ -37,6 +39,8 @@ export default function RequestDetailScreen() {
     : params.requestId;
 
   const { request, loading, refreshing, error, reload } = useBookingRequest(requestId);
+  // Ảnh xe: ảnh Storage của danh mục hiện tại nếu có, nếu không thì ảnh trong repo.
+  const { cars: catalogCars } = useCarCatalog();
 
   // Huỷ 2 bước: bấm lần 1 hiện xác nhận, bấm lần 2 mới gửi.
   const [cancelArmed, setCancelArmed] = useState(false);
@@ -83,7 +87,7 @@ export default function RequestDetailScreen() {
     );
   }
 
-  const car = getCarById(request.carId);
+  const carImage = carImageFor(request.carId, catalogCars);
   const price = bookingPriceView(request);
 
   const handleCancel = async () => {
@@ -136,13 +140,7 @@ export default function RequestDetailScreen() {
         </View>
 
         <View style={styles.carCard}>
-          {car && (
-            <Image
-              source={car.image}
-              style={styles.carImage}
-              resizeMode="cover"
-            />
-          )}
+          {carImage && <CarPhoto source={carImage} />}
 
           <View style={styles.carInfo}>
             <Text style={styles.carName}>{request.carName}</Text>
@@ -283,6 +281,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     padding: 20,
     paddingTop: 65,
     paddingBottom: 100,
@@ -369,12 +370,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#303030',
     marginBottom: 16,
-  },
-
-  carImage: {
-    width: '100%',
-    height: 190,
-    backgroundColor: '#202020',
   },
 
   carInfo: {

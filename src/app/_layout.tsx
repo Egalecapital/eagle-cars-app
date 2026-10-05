@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import Head from 'expo-router/head';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -9,6 +10,14 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   return (
     <>
+      {/* Web: tiêu đề + mô tả mặc định cho tab trình duyệt / kết quả tìm kiếm. */}
+      <Head>
+        <title>Eagle Capital Cars — Thuê xe sang</title>
+        <meta
+          name="description"
+          content="Đặt thuê xe sang tự lái, có lái và xe cưới cùng Eagle Capital Cars. Xem xe, chọn lịch và gửi yêu cầu đặt xe trực tuyến."
+        />
+      </Head>
       <AnimatedSplashOverlay />
       <PushHandler />
 

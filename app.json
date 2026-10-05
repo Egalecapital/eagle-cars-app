@@ -2,6 +2,7 @@
   "expo": {
     "name": "Eagle Cars",
     "slug": "eagle-cars-app",
+    "owner": "eagle-capital",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -27,7 +28,7 @@
       "package": "vn.eaglecapital.cars"
     },
     "web": {
-      "output": "static",
+      "output": "server",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -52,6 +53,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "04c4926d-2af3-4bbe-924f-aa101a998dd3"
+      }
     }
   }
 }

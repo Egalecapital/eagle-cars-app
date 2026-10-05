@@ -36,7 +36,7 @@ export const BOOKING_COLUMNS =
   'id, booking_code, car_id, car_name, service_type, pickup_at, return_at, ' +
   'pickup_location, return_location, customer_name, customer_phone, ' +
   'customer_note, price_per_day, rental_days, estimated_total, final_total, ' +
-  'status, status_reason, created_at, updated_at';
+  'status, status_reason, source, created_at, updated_at';
 
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,6 +61,8 @@ export type BookingRequestRow = {
   final_total: number | null;
   status: BookingStatus;
   status_reason: string | null;
+  /** 0014: 'app' = khách gửi qua app, 'admin' = admin nhập đơn ngoài app. */
+  source?: 'app' | 'admin';
   created_at: string;
   updated_at: string;
 };
@@ -83,6 +85,10 @@ const BACKEND_ERROR_MESSAGES: Record<string, string> = {
   CAR_ALREADY_BOOKED:
     'Xe đã có lịch trong khoảng thời gian này. Vui lòng chọn thời gian hoặc xe khác.',
   BOOKING_NOT_FOUND: 'Không tìm thấy yêu cầu này.',
+  DUPLICATE_REQUEST:
+    'Bạn đã gửi yêu cầu giống hệt cho xe và thời gian này. Vui lòng xem trong "Đơn của tôi".',
+  TOO_MANY_REQUESTS:
+    'Bạn gửi quá nhiều yêu cầu trong thời gian ngắn. Vui lòng thử lại sau hoặc liên hệ Eagle Capital.',
   BOOKING_NOT_CANCELLABLE:
     'Yêu cầu không còn ở trạng thái Chờ xác nhận nên không thể tự hủy. Vui lòng liên hệ Eagle Capital.',
 };
@@ -190,6 +196,7 @@ export function toBookingRequest(row: BookingRequestRow): BookingRequest {
     finalTotal: row.final_total === null ? null : Number(row.final_total),
     status: row.status,
     statusReason: row.status_reason,
+    source: row.source ?? 'app',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -280,6 +287,32 @@ export async function getMyBookingRequests(): Promise<BookingRequest[]> {
   }
 
   return ((data ?? []) as unknown as BookingRequestRow[]).map(toBookingRequest);
+}
+
+/**
+ * Họ tên + số điện thoại của đơn gần nhất trên phiên này (để điền sẵn form
+ * đặt xe). Không tạo phiên mới; lỗi / chưa có đơn → undefined.
+ */
+export async function getLastBookingContact(): Promise<
+  { fullName: string; phone: string } | undefined
+> {
+  const userId = await getSessionUserId();
+
+  if (!userId) return undefined;
+
+  const { data, error } = await supabase
+    .from('booking_requests')
+    .select('customer_name, customer_phone')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return undefined;
+
+  const row = data as { customer_name: string; customer_phone: string };
+
+  return { fullName: row.customer_name, phone: row.customer_phone };
 }
 
 /**

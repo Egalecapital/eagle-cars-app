@@ -1,6 +1,7 @@
 import {
     BookingServiceError,
     createBookingRequest,
+    getLastBookingContact,
 } from '@/services/booking-service';
 import { goBackOr } from '@/utils/navigation';
 import { useCarAvailability } from '@/hooks/use-car-availability';
@@ -19,7 +20,7 @@ import {
     vnWeekday,
 } from '@/utils/vn-time';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Image,
     KeyboardAvoidingView,
@@ -162,9 +163,10 @@ export default function BookingScreen() {
 
   const [dateOptions] = useState(buildDateOptions);
 
-  const [serviceType, setServiceType] = useState<ServiceType | undefined>(
-    availableServices.length === 1 ? availableServices[0] : undefined
-  );
+  const [pickedService, setServiceType] = useState<ServiceType | undefined>();
+  // Xe chỉ có một hình thức thuê → chọn sẵn (danh mục có thể tải xong sau lần render đầu).
+  const serviceType =
+    pickedService ?? (availableServices.length === 1 ? availableServices[0] : undefined);
 
   const [schedule, setSchedule] = useState<Schedule>({
     pickupDate: '',
@@ -179,6 +181,23 @@ export default function BookingScreen() {
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+
+  // Khách đặt lại: điền sẵn họ tên / SĐT của đơn gần nhất trên máy này
+  // (chỉ khi khách chưa gõ gì).
+  useEffect(() => {
+    let active = true;
+
+    getLastBookingContact().then((contact) => {
+      if (!active || !contact) return;
+
+      setFullName((current) => current || contact.fullName);
+      setPhone((current) => current || contact.phone);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   const [note, setNote] = useState('');
 
   const [showErrors, setShowErrors] = useState(false);
@@ -284,14 +303,22 @@ export default function BookingScreen() {
 
     pickupLocation: !pickupLocation.trim()
       ? 'Vui lòng nhập địa điểm nhận xe.'
-      : '',
+      : pickupLocation.trim().length < 3
+        ? 'Địa điểm nhận xe cần ít nhất 3 ký tự.'
+        : '',
 
     returnLocation:
       !sameReturnLocation && !returnLocation.trim()
         ? 'Vui lòng nhập địa điểm trả xe.'
-        : '',
+        : !sameReturnLocation && returnLocation.trim().length < 3
+          ? 'Địa điểm trả xe cần ít nhất 3 ký tự.'
+          : '',
 
-    fullName: !fullName.trim() ? 'Vui lòng nhập họ và tên.' : '',
+    fullName: !fullName.trim()
+      ? 'Vui lòng nhập họ và tên.'
+      : fullName.trim().length < 2
+        ? 'Họ và tên cần ít nhất 2 ký tự.'
+        : '',
 
     phone: !phone.trim()
       ? 'Vui lòng nhập số điện thoại.'
@@ -632,6 +659,7 @@ export default function BookingScreen() {
         <Text style={styles.label}>Địa điểm nhận xe *</Text>
         <TextInput
           value={pickupLocation}
+          maxLength={300}
           onChangeText={setPickupLocation}
           placeholder="VD: 123 Nguyễn Huệ, Quận 1"
           placeholderTextColor="#777777"
@@ -666,6 +694,7 @@ export default function BookingScreen() {
             <Text style={styles.label}>Địa điểm trả xe *</Text>
             <TextInput
               value={returnLocation}
+              maxLength={300}
               onChangeText={setReturnLocation}
               placeholder="Nhập địa điểm trả xe"
               placeholderTextColor="#777777"
@@ -684,6 +713,7 @@ export default function BookingScreen() {
         <Text style={styles.label}>Họ và tên *</Text>
         <TextInput
           value={fullName}
+          maxLength={100}
           onChangeText={setFullName}
           placeholder="Nguyễn Văn A"
           placeholderTextColor="#777777"
@@ -699,6 +729,7 @@ export default function BookingScreen() {
         <Text style={styles.label}>Số điện thoại *</Text>
         <TextInput
           value={phone}
+          maxLength={20}
           onChangeText={setPhone}
           placeholder="09xx xxx xxx"
           placeholderTextColor="#777777"
@@ -715,6 +746,7 @@ export default function BookingScreen() {
         <Text style={styles.label}>Ghi chú / yêu cầu thêm</Text>
         <TextInput
           value={note}
+          maxLength={1000}
           onChangeText={setNote}
           placeholder="VD: cần ghế trẻ em, trang trí xe hoa..."
           placeholderTextColor="#777777"

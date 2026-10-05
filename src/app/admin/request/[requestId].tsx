@@ -18,6 +18,7 @@ import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { BookingStatusTimeline } from '@/components/booking-status-timeline';
 import {
   useAdminBookingRequest,
+  useAdminCarSchedule,
   useAdminGuard,
   useAdminNotifications,
   useBookingAccount,
@@ -55,6 +56,13 @@ export default function AdminRequestDetailScreen() {
   const history = useBookingStatusEvents(requestId, ready);
   const telegram = useAdminNotifications('all', ready && !!request, request?.id);
   const owner = useBookingAccount(requestId, ready);
+  // Đơn khác của cùng xe chồng thời gian (đơn chờ / đã xác nhận).
+  const sameCar = useAdminCarSchedule(
+    request?.carId,
+    new Date(request?.pickupAt ?? 0),
+    new Date(request?.returnAt ?? 0),
+    ready && !!request
+  );
   const customerNotifications = useBookingCustomerNotifications(
     request ? { id: request.id, bookingCode: request.bookingCode } : undefined,
     ready && !!request
@@ -95,6 +103,7 @@ export default function AdminRequestDetailScreen() {
 
   const isPending = request.status === 'pending';
   const isConfirmed = request.status === 'confirmed';
+  const overlaps = sameCar.requests.filter((item) => item.id !== request.id);
   const finalTotalDigits = finalTotalText.replace(/\D/g, '');
   const phoneDigits = request.customer.phone.replace(/[^\d+]/g, '');
 
@@ -184,6 +193,32 @@ export default function AdminRequestDetailScreen() {
         </View>
         <Text style={styles.carName}>{request.carName}</Text>
 
+        {(isPending || isConfirmed) && overlaps.length > 0 && (
+          <View
+            style={[
+              styles.overlapBox,
+              overlaps.some((item) => item.status === 'confirmed') && styles.overlapDanger,
+            ]}
+          >
+            <Text style={styles.overlapTitle}>
+              ⚠ Xe này có {overlaps.length} đơn khác trùng thời gian:
+            </Text>
+            {overlaps.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() =>
+                  router.push({ pathname: '/admin/request/[requestId]', params: { requestId: item.id } })
+                }
+              >
+                <Text style={styles.overlapItem}>
+                  {item.bookingCode} · {item.customer.fullName} · {formatDateTime(item.pickupAt)} (
+                  {item.status === 'confirmed' ? 'ĐÃ XÁC NHẬN' : 'chờ'}) ›
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <Section title="Thông tin thuê">
           <Row label="Hình thức" value={request.serviceType} />
           <Row label="Nhận xe" value={formatDateTime(request.pickupAt)} />
@@ -197,7 +232,14 @@ export default function AdminRequestDetailScreen() {
           <Row label="Họ và tên" value={request.customer.fullName} />
           <Row label="Số điện thoại" value={request.customer.phone} />
           <Row label="Ghi chú" value={request.note || '—'} />
-          <Row label="Tài khoản" value={describeAccount(owner.account, owner.error)} />
+          <Row
+            label="Tài khoản"
+            value={
+              request.source === 'admin'
+                ? 'Đơn admin nhập (khách gọi điện / trực tiếp)'
+                : describeAccount(owner.account, owner.error)
+            }
+          />
 
           {phoneDigits.length >= 9 && (
             <TouchableOpacity style={styles.callButton} onPress={callCustomer}>
@@ -500,6 +542,17 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 80 },
   preview: { color: '#5CC98A', fontSize: 13, marginTop: 6 },
   mutedText: { color: '#888888', fontSize: 14, lineHeight: 20 },
+  overlapBox: {
+    borderWidth: 1,
+    borderColor: GOLD,
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 14,
+  },
+  overlapDanger: { borderColor: '#E5534B', backgroundColor: '#2A1414' },
+  overlapTitle: { color: '#FFFFFF', fontWeight: '900', fontSize: 14, marginBottom: 6 },
+  overlapItem: { color: GOLD, fontSize: 13, lineHeight: 22, fontWeight: '700' },
   customerNotification: {
     borderBottomWidth: 1,
     borderBottomColor: '#232323',

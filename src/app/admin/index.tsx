@@ -17,6 +17,7 @@ import {
   useAdminBookingSearch,
   useAdminGuard,
   useNotificationSummary,
+  usePendingCount,
   usePushSummary,
 } from '@/hooks/use-admin';
 import { signOutAdmin } from '@/services/admin-auth-service';
@@ -31,6 +32,7 @@ const GOLD = '#D4AF37';
 const ADMIN_CALENDAR = '/admin/calendar' as Href;
 const ADMIN_CARS = '/admin/cars' as Href;
 const ADMIN_NOTIFICATIONS = '/admin/notifications' as Href;
+const ADMIN_NEW_BOOKING = '/admin/new-booking' as Href;
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -54,6 +56,7 @@ export default function AdminRequestsScreen() {
   const { summary } = useNotificationSummary(ready);
   const { summary: pushSummary } = usePushSummary(ready);
   const failedTotal = summary.failed + pushSummary.failed;
+  const { pendingCount, reload: reloadPending } = usePendingCount(ready);
   // Mốc "bây giờ" cho nhãn GẤP; cập nhật khi kéo để làm mới.
   const [now, setNow] = useState(() => Date.now());
 
@@ -63,6 +66,7 @@ export default function AdminRequestsScreen() {
   const refresh = () => {
     setNow(Date.now());
     reload();
+    reloadPending();
   };
 
   const handleSignOut = async () => {
@@ -125,6 +129,14 @@ export default function AdminRequestsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.newBookingButton}
+          activeOpacity={0.8}
+          onPress={() => router.push(ADMIN_NEW_BOOKING)}
+        >
+          <Text style={styles.newBookingText}>+ TẠO ĐƠN (khách gọi điện / trực tiếp)</Text>
+        </TouchableOpacity>
 
         {(failedTotal > 0 || summary.overduePending > 0) && (
           <TouchableOpacity
@@ -222,7 +234,9 @@ export default function AdminRequestsScreen() {
                     onPress={() => setFilter(item.value)}
                   >
                     <Text style={[styles.filterText, active && styles.filterTextActive]}>
-                      {item.label}
+                      {item.value === 'pending' && pendingCount > 0
+                        ? `${item.label} (${pendingCount})`
+                        : item.label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -298,6 +312,7 @@ function AdminRequestCard({
       <Text style={styles.carName}>{request.carName}</Text>
       <Text style={styles.meta}>
         {request.serviceType} • {request.customer.fullName} • {request.customer.phone}
+        {request.source === 'admin' ? ' • Admin nhập' : ''}
       </Text>
 
       <Text style={styles.time}>Nhận: {formatDateTime(request.pickupAt)}</Text>
@@ -339,6 +354,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   calendarButtonText: { color: GOLD, fontWeight: '900', letterSpacing: 0.5, fontSize: 13 },
+  newBookingButton: {
+    backgroundColor: GOLD,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  newBookingText: { color: '#080808', fontWeight: '900', fontSize: 14 },
   navButtonAlert: { borderColor: '#E5534B', backgroundColor: 'rgba(229, 83, 75, 0.12)' },
   navTextAlert: { color: '#FF8A80' },
   alertBanner: {

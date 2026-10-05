@@ -53,6 +53,9 @@ export type BookingRequest = {
   status: BookingStatus;
   statusReason: string | null;
 
+  /** 'app' = khách gửi qua app; 'admin' = admin nhập (khách gọi điện / trực tiếp). */
+  source: 'app' | 'admin';
+
   createdAt: string;
   updatedAt: string;
 };

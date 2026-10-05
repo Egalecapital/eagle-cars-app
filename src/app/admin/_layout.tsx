@@ -12,6 +12,7 @@ export default function AdminLayout() {
       <Stack.Screen name="calendar" />
       <Stack.Screen name="cars" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="new-booking" />
       <Stack.Screen name="request/[requestId]" />
     </Stack>
   );

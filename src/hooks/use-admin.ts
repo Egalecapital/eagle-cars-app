@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { checkIsAdmin } from '@/services/admin-auth-service';
 import {
   AdminBookingError,
+  countPendingBookings,
   type AdminCar,
   type AdminNotification,
   type AdminStatusFilter,
@@ -510,4 +511,11 @@ export function useBookingCustomerNotifications(
   );
 
   return { notifications: data, loading, error, reload };
+}
+
+/** Số đơn đang chờ xác nhận; tự làm mới mỗi 60 giây. */
+export function usePendingCount(enabled: boolean) {
+  const { data, reload } = useAdminResource(countPendingBookings, 0, enabled, AUTO_REFRESH_MS);
+
+  return { pendingCount: data, reload };
 }

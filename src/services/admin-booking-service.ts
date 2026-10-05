@@ -25,7 +25,7 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   PICKUP_IN_PAST: 'Đơn đã quá giờ nhận xe, không thể xác nhận. Hãy từ chối đơn.',
   CAR_NOT_AVAILABLE: 'Xe đang tạm ngừng nhận đặt, không thể xác nhận.',
   INVALID_FINAL_TOTAL: 'Giá chốt không hợp lệ.',
-  NOTE_TOO_LONG: 'Ghi chú tối đa 500 ký tự.',
+  NOTE_TOO_LONG: 'Ghi chú quá dài (ghi chú cho khách tối đa 500 ký tự, ghi chú đơn tối đa 1000 ký tự).',
   REASON_REQUIRED: 'Vui lòng nhập lý do từ chối (ít nhất 3 ký tự).',
   REASON_TOO_LONG: 'Lý do tối đa 500 ký tự.',
   INVALID_STATUS_TRANSITION: 'Không thể chuyển đơn sang trạng thái này.',
@@ -36,6 +36,13 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   CAR_NOT_FOUND: 'Không tìm thấy xe này.',
   INVALID_QUERY: 'Nhập ít nhất 2 ký tự (hoặc 4 chữ số điện thoại), tối đa 100 ký tự.',
   INVALID_STATUS: 'Bộ lọc trạng thái không hợp lệ.',
+  INVALID_SERVICE_TYPE: 'Vui lòng chọn hình thức thuê.',
+  INVALID_TIME_RANGE: 'Giờ trả xe phải sau giờ nhận xe.',
+  PICKUP_TOO_OLD: 'Giờ nhận xe không được sớm hơn 24 giờ trước thời điểm hiện tại.',
+  RENTAL_TOO_LONG: 'Mỗi đơn tối đa 30 ngày. Hãy tách thành nhiều đơn.',
+  INVALID_LOCATION: 'Địa điểm nhận/trả cần từ 3 đến 300 ký tự.',
+  INVALID_NAME: 'Họ tên khách cần từ 2 đến 100 ký tự.',
+  INVALID_PHONE: 'Số điện thoại cần 9–11 chữ số.',
   NOTIFICATION_NOT_FOUND: 'Không tìm thấy thông báo này.',
   NOTIFICATION_NOT_FAILED: 'Thông báo không còn ở trạng thái thất bại. Vui lòng tải lại.',
 };
@@ -755,4 +762,60 @@ export function describeNotificationError(code: string | null): string | undefin
   }
 
   return code;
+}
+
+export type AdminBookingInput = {
+  carId: string;
+  /** Giá trị DB: self_drive | with_driver | wedding. */
+  serviceType: 'self_drive' | 'with_driver' | 'wedding';
+  pickupAt: string;
+  returnAt: string;
+  pickupLocation: string;
+  returnLocation: string;
+  customerName: string;
+  customerPhone: string;
+  note: string;
+  finalTotal: number | null;
+  /** true = xác nhận ngay (giữ lịch xe); false = để Chờ xác nhận. */
+  confirm: boolean;
+};
+
+/**
+ * Admin nhập đơn ngoài app (khách gọi điện / đến trực tiếp) — RPC 0014.
+ * Mặc định xác nhận ngay để giữ lịch xe; trùng đơn đã xác nhận → BOOKING_CONFLICT.
+ */
+export async function createAdminBooking(input: AdminBookingInput): Promise<BookingRequest> {
+  const { data, error } = await supabase.rpc('admin_create_booking', {
+    p_car_id: input.carId,
+    p_service_type: input.serviceType,
+    p_pickup_at: input.pickupAt,
+    p_return_at: input.returnAt,
+    p_pickup_location: input.pickupLocation.trim(),
+    p_return_location: input.returnLocation.trim() || null,
+    p_customer_name: input.customerName.trim(),
+    p_customer_phone: input.customerPhone.trim(),
+    p_customer_note: input.note.trim() || null,
+    p_final_total: input.finalTotal,
+    p_confirm: input.confirm,
+  });
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return toBookingRequest(data as BookingRequestRow);
+}
+
+/** Số đơn đang chờ xác nhận (cho nhãn bộ lọc). */
+export async function countPendingBookings(): Promise<number> {
+  const { count, error } = await supabase
+    .from('booking_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending');
+
+  if (error) {
+    throw toAdminError(error);
+  }
+
+  return count ?? 0;
 }
